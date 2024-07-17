@@ -22,3 +22,7 @@
 
 ## Log files
 *.log
+
+## Sublime Text files
+*.sublime-project
+*.sublime-workspace
