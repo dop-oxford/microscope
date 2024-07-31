@@ -159,7 +159,6 @@ class BRamanController():
             if stage_name.lower() == 'zfm2020':
                 controller_name = config['controller_name']
                 if controller_name.lower() == 'mcm3000':
-                    print('hi')
                     return ZFM2020Stage(config, controller='MCM3000')
                 else:
                     raise ValueError(
@@ -185,29 +184,31 @@ class BRamanController():
                     pass
                 else:
                     raise ValueError(
-                        f"Unsupported controller name: {controller_name} for stage {module_type}"
+                        f'Unsupported controller name: {controller_name} ' +
+                        f'for stage {module_type}'
                     )
             else:
                 raise ValueError(
-                    f"Unsupported stage name: {stage_name} for module {module_type}"
+                    f'Unsupported stage name: {stage_name} for module ' +
+                    f'{module_type}'
                 )
 
-        elif module_type == "camera":
-            name = config["name"]
-            if name.lower() == "cs165cu":
+        elif module_type == 'camera':
+            name = config['name']
+            if name.lower() == 'cs165cu':
                 return CS165CUBRCamera(config)
             else:
-                raise ValueError(f"Unsupported camera name: {name}")
+                raise ValueError(f'Unsupported camera name: {name}')
 
-        elif module_type == "spectrometer":
-            name = config["name"]
-            if name.lower() == "ibseneagle":
+        elif module_type == 'spectrometer':
+            name = config['name']
+            if name.lower() == 'ibseneagle':
                 print('unimplemented')
                 # return IbsenEagleSpectrometer(config)
             else:
-                raise ValueError(f"Unsupported spectrometer name: {name}")
+                raise ValueError(f'Unsupported spectrometer name: {name}')
         else:
-            raise ValueError(f"Unsupported module type: {module_type}")
+            raise ValueError(f'Unsupported module type: {module_type}')
 
     def set_metadata(self, set_all=False, verbose=False):
         # The measurement metadata always is updated
@@ -231,16 +232,15 @@ class BRamanController():
         if verbose:
             print(self.metadata)
 
-    def set_measurement_metadata(self, update_all=True, verbose=False):
+    def set_measurement_metadata(self, update_all = True, verbose = False):
         self.meas_metadata = {
-            'DateTime': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'Position [μm]': self.get_position(),
-            'Temperature [C]': "N/A",
-            'Humidity [1/100]': "N/A"
+            "DateTime": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "Position [um]": self.get_position(),
+            "Temperature [C]": "N/A",
+            "Humidity [1/100]": "N/A"
         }
         if self.spectrometer:
-            self.meas_metadata['Spectro_Temp [C]'] = \
-                self.spectrometer.get_current_temperature()[1]
+            self.meas_metadata['Spectro_Temp [C]'] = self.spectrometer.get_current_temperature()[1]
         if verbose:
             print(self.meas_metadata)
         if update_all:
