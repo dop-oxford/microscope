@@ -1,4 +1,4 @@
-"""ZFM2020Stage Class."""
+"""ZFM2020Stage class."""
 import warnings
 
 import sys
@@ -14,6 +14,7 @@ from controllers.mcm3000 import MCM3000Controller
 class ZFM2020Stage(BRamanZStage, MCM3000Controller):
 
     def __init__(self, config, controller='MCM3000'):
+        """Initialise a new instance of the ZFM2020Stage class."""
         if 'port' not in config:
             raise ValueError('Configuration must have a port')
         if 'channel' not in config:
@@ -51,9 +52,7 @@ class ZFM2020Stage(BRamanZStage, MCM3000Controller):
         BRamanZStage.__init__(self, unit=unit, stage_name=self.stage_name)
 
     def print_info(self):
-        """
-        Prints information about the stage controller.
-        """
+        """Print information about the stage controller."""
         print('\n---------------------')
         print('---------------------')
         print(f"Stage {self.stage_name} INFO:")
@@ -71,34 +70,41 @@ class ZFM2020Stage(BRamanZStage, MCM3000Controller):
 
     def initialize(self, force_home=False, verbose=False):
         """
-        Initializes the ZFM2020 stage.
+        Initialise the ZFM2020 stage.
 
-        Currently, this method indicates that the ZFM2020 stage does not require initialization.
+        Currently, this method indicates that the ZFM2020 stage does not
+        require initialization.
 
         Args:
             force_home (bool): Ignored for this stage.
             verbose (bool): If True, prints the initialization message.
         """
-        print("ZFM2020 Stage does not require initialization.")
+        print('ZFM2020 Stage does not require initialization.')
 
     def _move_um(self, target_pos_um, relative=True, verbose=False):
         """
-        Moves the stage to the specified position in micrometers.
+        Move the stage to the specified position in micrometers.
 
-        Overrides the method to utilize the MCM3000 controller's move function specific to the ZFM2020's configured channel.
+        Overrides the method to utilize the MCM3000 controller's move function
+        specific to the ZFM2020's configured channel.
 
         Args:
             target_pos_um (float): The target position in micrometers.
-            relative (bool): If True, the movement is relative to the current position.
+            relative (bool): If True, the movement is relative to the current
+            position.
             verbose (bool): If True, prints detailed movement information.
         """
-        MCM3000Controller.move_um(self, channel=self.channel, move_um=int(target_pos_um), relative=relative, block=True, verbose=verbose)
+        MCM3000Controller.move_um(
+            self, channel=self.channel, move_um=int(target_pos_um),
+            relative=relative, block=True, verbose=verbose
+        )
 
     def _get_position_um(self, verbose=False):
         """
-        Retrieves the current position of the ZFM2020 stage in micrometers.
+        Retrieve the current position of the ZFM2020 stage in micrometers.
 
-        Utilizes the MCM3000 controller's functionality to get the current stage position for the configured channel.
+        Utilizes the MCM3000 controller's functionality to get the current
+        stage position for the configured channel.
 
         Args:
             verbose (bool): If True, prints detailed position information.
@@ -106,61 +112,83 @@ class ZFM2020Stage(BRamanZStage, MCM3000Controller):
         Returns:
             float: The current stage position in micrometers.
         """
-        return MCM3000Controller.get_position_um(self, channel=self.channel, verbose=verbose)
+        return MCM3000Controller.get_position_um(
+            self, channel=self.channel, verbose=verbose
+        )
 
-    def _set_retract_pos_um(self, retract_pos_um=None, relative=False, verbose=False):
+    def _set_retract_pos_um(
+        self, retract_pos_um=None, relative=False, verbose=False
+    ):
         """
-        Sets the retract position for the ZFM2020 stage in micrometers.
+        Set the retract position for the ZFM2020 stage in micrometers.
 
-        Utilizes the MCM3000 controller's functionality to set a retract position for the configured channel.
+        Utilizes the MCM3000 controller's functionality to set a retract
+        position for the configured channel.
 
         Args:
-            retract_pos_um (float, optional): The retract position in micrometers. If None, uses current position.
-            relative (bool): If True, the setting is relative to the current position.
-            verbose (bool): If True, prints detailed information about the retract position setting.
+            retract_pos_um (float, optional): The retract position in
+            micrometers. If None, uses current position.
+            relative (bool): If True, the setting is relative to the current
+            position.
+            verbose (bool): If True, prints detailed information about the
+            retract position setting.
         """
-        MCM3000Controller.set_retract_point_um(self, channel=self.channel, retract_pos_um=int(retract_pos_um), relative=relative, verbose=verbose)
+        MCM3000Controller.set_retract_point_um(
+            self, channel=self.channel, retract_pos_um=int(retract_pos_um),
+            relative=relative, verbose=verbose
+        )
 
     def _get_initial_retract_pos_um(self):
         """
-        Retrieves the initial retract position of the ZFM2020 stage in micrometers.
+        Retrieve the initial retract position of the stage in micrometers.
 
-        Uses the MCM3000 controller's functionality to get the retract position for the configured channel.
+        Uses the MCM3000 controller's functionality to get the retract position
+        for the configured channel.
 
         Returns:
             float: The initial retract position in micrometers.
         """
         return MCM3000Controller.get_retract_point_um(self, self.channel)
-    
+
     def set_velocity_params(self, vel_params, verbose=False):
         """
-        Sets the velocity parameters of the Z-stage.
+        Set the velocity parameters of the Z-stage.
 
         Args:
-            vel_params (dict): A dictionary containing the velocity parameters for the stage.
-            verbose (bool): If True, prints detailed information about the operation.
+            vel_params (dict): A dictionary containing the velocity parameters
+            for the stage.
+            verbose (bool): If True, prints detailed information about the
+            operation.
         """
-        print(f"Velocity parameters cannot be changed on stage {self.stage_name} with controller {self.controller_name}.")
+        msg = 'Velocity parameters cannot be changed on stage ' + \
+            f'{self.stage_name} with controller {self.controller_name}.'
+        print(msg)
 
     def set_acceleration_params(self, acc_params, verbose=False):
         """
-        Sets the acceleration parameters of the Z-stage.
+        Set the acceleration parameters of the Z-stage.
 
         Args:
-            acc_params (dict): A dictionary containing the acceleration parameters for the stage.
-            verbose (bool): If True, prints detailed information about the operation.
+            acc_params (dict): A dictionary containing the acceleration
+            parameters for the stage.
+            verbose (bool): If True, prints detailed information about the
+            operation.
         """
-        print(f"Acceleration parameters cannot be changed on stage {self.stage_name} with controller {self.controller_name}.")
+        msg = 'Acceleration parameters cannot be changed on stage ' + \
+            f'{self.stage_name} with controller {self.controller_name}.'
+        print(msg)
 
     def close(self, force=False, verbose=False, simulated=False):
         """
-        Closes the ZFM2020 stage controller, ensuring any necessary cleanup is performed.
+        Close the stage controller.
 
-        Closes the connection and optionally prints a message indicating the closure.
+        Closes the connection and optionally prints a message indicating the
+        closure. Ensures that any necessary cleanup is performed.
 
         Args:
             force (bool): Currently unused.
-            verbose (bool): If True, prints a message indicating that the stage controller has been closed.
+            verbose (bool): If True, prints a message indicating that the stage
+            controller has been closed.
         """
         MCM3000Controller.close(self, verbose=False, simulated=simulated)
         if verbose:
@@ -170,13 +198,13 @@ class ZFM2020Stage(BRamanZStage, MCM3000Controller):
 if __name__ == '__main__':
     # Example of a successful initialization with valid configuration
     valid_config = {
-        "port": "COM3",
-        "channel": 1,
-        "stage_name": "ZFM2020",
-        "reverse": True,
-        "verbose": True,
-        "very_verbose": True,
-        "unit": "mm"
+        'port': 'COM3',
+        'channel': 1,
+        'stage_name': 'ZFM2020',
+        'reverse': True,
+        'verbose': True,
+        'very_verbose': True,
+        'unit': 'mm'
     }
 
     print('Attempting to initialize with a valid configuration...')

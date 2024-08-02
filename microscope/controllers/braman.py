@@ -1,5 +1,7 @@
 """B Raman controller."""
 from datetime import datetime
+import numpy as np
+import pandas as pd
 # Custom modules
 import microscope.abc
 
@@ -15,40 +17,44 @@ from stages.zfm2020 import ZFM2020Stage
 from spectrometers.ibseneagle import IbsenEagleSpectrometer
 
 config = {
-    "exc_wl_nm": 785,
-    "exc_power_mW": 14,
-    "objective": "N PLAN 10x/0.25",
-    "tube_lens": "WFA4100",
-    "z_stage": {
-        "stage_name": "ZFM2020",
-        "controller_name": "MCM3000",
-        "port": "COM3",
-        "channel": 1,
-        "unit": "um",
-        "reverse": True,
-        "verbose": True,
-        "very_verbose": False
+    'exc_wl_nm': 785,
+    'exc_power_mW': 14,
+    'objective': 'N PLAN 10x/0.25',
+    'tube_lens': 'WFA4100',
+    'z_stage': {
+        'stage_name': 'ZFM2020',
+        'controller_name': 'MCM3000',
+        'port': 'COM3',
+        'channel': 1,
+        'unit': 'um',
+        'reverse': True,
+        'verbose': True,
+        'very_verbose': False
     },
-    "spectrometer": {
-        "name": "IbsenEAGLE",
-        "temperature": -60,
-        "acquisition_mode": 2,
-        "integration_time": 0.5,
-        "number_accumulations": 1,
-        "number_scans": 1,
-        "read_mode": 0,
-        "trigger_mode": 0,
-        "xpixels": -9999,
-        "ypixels": -9999
+    'spectrometer': {
+        'name': 'IbsenEAGLE',
+        'temperature': -60,
+        'acquisition_mode': 2,
+        'integration_time': 0.5,
+        'number_accumulations': 1,
+        'number_scans': 1,
+        'read_mode': 0,
+        'trigger_mode': 0,
+        'xpixels': -9999,
+        'ypixels': -9999
     }
 }
-
 print(config)
+
 
 # class BRamanController(microscope.abc.Controller):
 class BRamanController():
 
-    def __init__(self, config=config):
+    def __init__(self, config=config, simulated=False):
+        """Initialise a new instance of the 'B Raman controller' class."""
+        if simulated:
+            print('Initialising a simulated B Raman controller')
+
         self.units = ['mm', 'mm', 'μm']
 
         # Define modules and a dictionary of module set-up methods for each
@@ -214,16 +220,18 @@ class BRamanController():
         # The measurement metadata always is updated
         self.set_measurement_metadata(update_all=False)
         print('unimplemented')
-        # if set_all:
-        #     self.set_laser_metadata(
-        #         exc_pwr_mW=self.exc_power_mW, 
-        #         xc_wl_nm=self.exc_wl_nm,
-        #         update_all=False
-        #     )
-        #     self.set_objective_metadata(update_all=False)
-        #     self.set_imaging_metadata(update_all=False)
-        #     if self.spectrometer: self.set_spectro_metadata(update_all=False)
-        #     if self.camera: self.set_camera_metadata(update_all=False);
+        if set_all:
+            self.set_laser_metadata(
+                exc_pwr_mW=self.exc_power_mW,
+                exc_wl_nm=self.exc_wl_nm,
+                update_all=False
+            )
+            self.set_objective_metadata(update_all=False)
+            self.set_imaging_metadata(update_all=False)
+            if self.spectrometer:
+                self.set_spectro_metadata(update_all=False)
+            if self.camera:
+                self.set_camera_metadata(update_all=False)
         self.metadata = {
             **self.meas_metadata, **self.laser_metadata,
             **self.objective_metadata, **self.spectro_metadata,
@@ -232,35 +240,162 @@ class BRamanController():
         if verbose:
             print(self.metadata)
 
-    def set_measurement_metadata(self, update_all = True, verbose = False):
+    def set_laser_metadata(
+        self, exc_pwr_mW, exc_wl_nm=785, update_all=True, verbose=False
+    ):
+        # TODO fix error to have the metadata from the attribute
+        self.laser_metadata = {
+            "Laser power [mW]": exc_pwr_mW,
+            "Excitation wavelength [nm]": exc_wl_nm
+        }
+        if verbose:
+            print(self.laser_metadata)
+        if update_all:
+            self.set_metadata(set_all=False)
+
+    def set_objective_metadata(self, update_all=True, verbose=False):
+        self.objective_metadata = self.objective.get_metadata()
+        if verbose:
+            print(self.objective_metadata)
+        if update_all:
+            self.set_metadata(set_all=False)
+
+    def set_imaging_metadata(
+        self, beam_diam=None, beam_offset=None, update_all=True, verbose=False
+    ):
+        laser_data = self.read_laser_data()
+        self.imaging_metadata = {
+            'Magnification': self.objective.get_magnification() *
+            self.tube_lens.get_magnification() *
+            self.tube_lens.get_focal_length() /
+            self.objective.get_f_tube_lens_design(),
+        }
+        if self.camera:
+            self.imaging_metadata['Image_Size'] = (
+                np.array(self.camera.get_sensor_size_um()) /
+                self.imaging_metadata['Magnification']
+            ).tolist()
+
+        if beam_diam is None:
+            self.imaging_metadata['spot_size'] = \
+                laser_data['spot_size'].values[0]
+        else:
+            self.imaging_metadata['spot_size'] = beam_diam
+
+        if beam_offset is None:
+            self.imaging_metadata['laser_offset'] = [
+                laser_data['offset_x'].values[0],
+                laser_data['offset_y'].values[0]
+            ]
+        else:
+            self.imaging_metadata['laser_offset'] = beam_offset
+
+        if verbose:
+            print(self.imaging_metadata)
+
+        if update_all:
+            self.set_metadata(set_all=False)
+
+    def set_tube_lens_metadata(self, update_all=True, verbose=False):
+        self.tube_lens_metadata = self.tube_lens.get_metadata()
+        if verbose:
+            print(self.tube_lens_metadata)
+        if update_all:
+            self.set_metadata(set_all=False)
+
+    def set_camera_metadata(self, update_all=True, verbose=False):
+        self.camera_metadata = self.camera.get_metadata()
+        if verbose:
+            print(self.camera_metadata)
+        if update_all:
+            self.set_metadata(set_all=False)
+
+    def read_laser_data(self):
+        # Check whether there is data for our current setup
+        obj_name = self.objective.get_name()
+        tube_name = self.tube_lens.get_name()
+
+        # Hard-code the B Raman beam parameters
+        dct = {
+            'objective': [
+                'UPlanFl', 'HC APO L 63x/0.90 W U-V-I', 'CFI Apo NIR 60X W',
+                'N PLAN 100x/0.90', 'N PLAN 10x/0.25', 'N PLAN 10x/0.25_2',
+                'EC Epiplan 20x/0.4', 'EC Epiplan 50x/0.75 HD',
+                'LD Plan-NEOFLUAR 63X/0.75 Korr',
+                'LD EC Epiplan-NEOFLUAR 100x/0.75 HD DIC',
+                'EC Epiplan 10x/0.25 HD', 'W "Plan-Apochromat" 63x/1.0',
+                'W "N-Achroplan" 20x/0.5', 'W "N-Achroplan" 10x/0.3 M27'
+            ],
+            'tube_lens': [
+                'WFA4100', 'WFA4100', 'WFA4100', 'WFA4100', 'WFA4100',
+                'WFA4100', 'WFA4100', 'WFA4100', 'WFA4100', 'WFA4100',
+                'WFA4100', 'WFA4100', 'WFA4100', 'WFA4100'
+            ],
+            'spot_size': [
+                None, None, None, None, 80, None, None, None, None, None, None,
+                None, None, None
+            ],
+            'offset_x': [
+                None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None
+            ],
+            'offset_y': [
+                None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None
+            ]
+        }
+        df = pd.DataFrame(dct)
+        print(df)
+
+        # Get the parameters for our current setup
+        condition = (df['objective'] == obj_name) & \
+            (df['tube_lens'] == tube_name)
+        data = df[condition]
+
+        # Check the number of rows in the result
+        num_rows = data.shape[0]
+        # If no rows satisfy the condition, raise an error
+        if num_rows == 0:
+            msg = f'There is no beam information for objective {obj_name} ' + \
+                f'and tube lens {tube_name}.'
+            raise Exception(msg)
+        # If more than one row satisfies the condition, raise an error
+        elif num_rows > 1:
+            msg = 'More than one row with information for objective ' + \
+                f'{obj_name} and tube lens {tube_name}.'
+            raise Exception(msg)
+
+        return data
+
+    def set_measurement_metadata(self, update_all=True, verbose=False):
         self.meas_metadata = {
-            "DateTime": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            "Position [um]": self.get_position(),
-            "Temperature [C]": "N/A",
-            "Humidity [1/100]": "N/A"
+            'DateTime': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'Position [um]': self.get_position(),
+            'Temperature [C]': 'N/A',
+            'Humidity [1/100]': 'N/A'
         }
         if self.spectrometer:
-            self.meas_metadata['Spectro_Temp [C]'] = self.spectrometer.get_current_temperature()[1]
+            self.meas_metadata['Spectro_Temp [C]'] = \
+                self.spectrometer.get_current_temperature()[1]
         if verbose:
             print(self.meas_metadata)
         if update_all:
             self.set_metadata(set_all=False)
 
     def get_position(self):
-        print('unimplemented')
-        # # Returns a 3-dim array with X, Y, and Z positions. If one of those is
-        # # not active, returns None
-        # pos = np.array([None, None, None])
-        # if self.XY_stage:
-        #     pos[0] = self.XY_stage.get_position()[0]
-        #     pos[1] = self.XY_stage.get_position()[1]
-        #     # TODO -> fix this I think is pos[0:2]
-        # if self.Z_stage:
-        #     pos[2] = self.Z_stage.get_position()
-        # return list(pos)
+        # Returns a 3-dim array with X, Y, and Z positions. If one of those is
+        # not active, returns None
+        pos = np.array([None, None, None])
+        if self.XY_stage:
+            pos[0] = self.XY_stage.get_position()[0]
+            pos[1] = self.XY_stage.get_position()[1]
+            # TODO -> fix this I think is pos[0:2]
+        if self.Z_stage:
+            pos[2] = self.Z_stage.get_position()
+        return list(pos)
 
 
 if __name__ == '__main__':
     # Test the BRamanController class
     print('Testing BRamanController class...')
-    brc = BRamanController()
+    brc = BRamanController(simulated=True)
