@@ -99,7 +99,7 @@ class ZFM2020Stage(BRamanZStage, MCM3000Controller):
             relative=relative, block=True, verbose=verbose
         )
 
-    def _get_position_um(self, verbose=False):
+    def _get_position_um(self, verbose=False, simulated=False):
         """
         Retrieve the current position of the ZFM2020 stage in micrometers.
 
@@ -113,7 +113,7 @@ class ZFM2020Stage(BRamanZStage, MCM3000Controller):
             float: The current stage position in micrometers.
         """
         return MCM3000Controller.get_position_um(
-            self, channel=self.channel, verbose=verbose
+            self, channel=self.channel, verbose=verbose, simulated=simulated
         )
 
     def _set_retract_pos_um(

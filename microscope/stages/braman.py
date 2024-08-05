@@ -374,7 +374,7 @@ class BRamanZStage(ABC):
         if unit is None:
             unit = self.unit
         unit = self.validate_unit(unit)
-        pos = self._get_position_um(verbose=False)
+        pos = self._get_position_um(verbose=False, simulated=simulated)
         if verbose:
             msg = f'Current Z Stage ({self.stage_name}) position: {pos} {unit}'
             print(msg)

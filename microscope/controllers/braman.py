@@ -1,12 +1,12 @@
 """B Raman controller."""
 from datetime import datetime
+import json
 import numpy as np
+import os
 import pandas as pd
+import sys
 # Custom modules
 import microscope.abc
-
-import sys
-import os
 
 # Add the parent directory to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -54,6 +54,9 @@ class BRamanController():
         """Initialise a new instance of the 'B Raman controller' class."""
         if simulated:
             print('Initialising a simulated B Raman controller')
+            self.simulated = True
+        else:
+            self.simulated = False
 
         self.units = ['mm', 'mm', 'μm']
 
@@ -123,9 +126,40 @@ class BRamanController():
         self.camera_metadata = dict()
         self.imaging_metadata = dict()
         self.metadata = dict()
-        self.set_metadata(set_all=True, verbose=True)
+        self.set_metadata(set_all=True, verbose=True, simulated=simulated)
 
         print("All INITIALIZED")
+
+    def initialize(self, force=False, verbose=False, module=None):
+        """
+        Initializes the specified module or all set modules by calling their
+        respective initialize methods. If a module has not been set, it will be
+        skipped.
+
+        Args:
+            force (bool, dict): A flag or dictionary indicating whether to
+                forcefully home the modules that can be homed. If a dictionary
+                is provided, the specific module's force value will be used; if
+                not present in the dictionary, False is assumed.
+            verbose (bool): A flag indicating whether to print verbose output
+                during the initializing process.
+            module (str, optional): Specific module to initialize. If None, all
+                modules are initialized.
+        """
+        modules_to_initialize = [module] if module else \
+            self._module_attributes.keys()
+
+        for module_key in modules_to_initialize:
+            module_attr = self._module_attributes.get(module_key)
+            if module_attr:
+                module_instance = getattr(self, module_attr)
+                if module_instance:
+                    actual_force = force.get(module_key, False) if \
+                        isinstance(force, dict) else force
+                    module_instance.initialize(actual_force, verbose)
+                    if verbose:
+                        print(f'{module_key} initialized.')
+        print('B Raman INITIALIZED')
 
     def check_for_unsupported_modules(self):
         """Ensure all modules in module_list are supported."""
@@ -216,10 +250,9 @@ class BRamanController():
         else:
             raise ValueError(f'Unsupported module type: {module_type}')
 
-    def set_metadata(self, set_all=False, verbose=False):
+    def set_metadata(self, set_all=False, verbose=False, simulated=False):
         # The measurement metadata always is updated
-        self.set_measurement_metadata(update_all=False)
-        print('unimplemented')
+        self.set_measurement_metadata(update_all=False, simulated=simulated)
         if set_all:
             self.set_laser_metadata(
                 exc_pwr_mW=self.exc_power_mW,
@@ -345,7 +378,6 @@ class BRamanController():
             ]
         }
         df = pd.DataFrame(dct)
-        print(df)
 
         # Get the parameters for our current setup
         condition = (df['objective'] == obj_name) & \
@@ -367,10 +399,12 @@ class BRamanController():
 
         return data
 
-    def set_measurement_metadata(self, update_all=True, verbose=False):
+    def set_measurement_metadata(
+        self, update_all=True, verbose=False, simulated=False
+    ):
         self.meas_metadata = {
             'DateTime': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'Position [um]': self.get_position(),
+            'Position [um]': self.get_position(simulated=simulated),
             'Temperature [C]': 'N/A',
             'Humidity [1/100]': 'N/A'
         }
@@ -382,7 +416,7 @@ class BRamanController():
         if update_all:
             self.set_metadata(set_all=False)
 
-    def get_position(self):
+    def get_position(self, simulated=False):
         # Returns a 3-dim array with X, Y, and Z positions. If one of those is
         # not active, returns None
         pos = np.array([None, None, None])
@@ -391,11 +425,362 @@ class BRamanController():
             pos[1] = self.XY_stage.get_position()[1]
             # TODO -> fix this I think is pos[0:2]
         if self.Z_stage:
-            pos[2] = self.Z_stage.get_position()
+            pos[2] = self.Z_stage.get_position(simulated=simulated)
         return list(pos)
+
+    def close(self, force=False, verbose=False, module=None):
+        """
+        Close the specified module or all initialized modules by calling their
+        respective close methods. If a module has not been initialized, it will
+        be skipped.
+
+        Args:
+            force (bool, dict): A flag or dictionary indicating whether to
+                forcefully close the modules. If a dictionary is provided, the
+                specific module's force value will be used; if not present in
+                the dictionary, False is assumed.
+            verbose (bool): A flag indicating whether to print verbose output
+                during the closing process.
+            module (str, optional): Specific module to close. If None, all
+                modules are closed.
+        """
+        modules_to_close = [module] if module else \
+            self._module_attributes.keys()
+
+        for module_key in modules_to_close:
+            module_attr = self._module_attributes.get(module_key)
+            if module_attr:
+                module_instance = getattr(self, module_attr)
+                if module_instance:
+                    actual_force = force.get(module_key, False) if \
+                        isinstance(force, dict) else force
+                    module_instance.close(actual_force, verbose)
+                    if verbose:
+                        print(f'{module_key} closed.')
+        print('B Raman CLOSED')
+
+    def home(self, force=False, verbose=False, module=None):
+        """
+        Homes the specified module or all modules by calling their respective
+        home methods. If a module has not been set, it will be skipped.
+
+        Args:
+            force (bool, dict): A flag or dictionary indicating whether to home
+                the modules forcefully, even if they have been already homed.
+                If a dictionary is provided, the specific module's force value
+                will be used; if not present in the dictionary, False is
+                assumed.
+            verbose (bool): A flag indicating whether to print verbose output
+                during the homing process.
+            module (str, optional): Specific module to home. If None, all
+                modules are homed.
+        """
+        modules_to_home = [module] if module else \
+            self._module_attributes.keys()
+
+        for module_key in modules_to_home:
+            module_attr = self._module_attributes.get(module_key)
+            if module_attr:
+                module_instance = getattr(self, module_attr)
+                if module_instance:
+                    actual_force = force.get(module_key, False) if \
+                        isinstance(force, dict) else force
+                    if hasattr(module_instance, 'home'):
+                        module_instance.home(
+                            force=actual_force, verbose=verbose
+                        )
+                        if verbose:
+                            print(f'{module_key} homed.')
+                    else:
+                        print(f'{module_key} does not support homing.')
+        print('B Raman HOMED')
+
+    def print_info(self, module=None):
+        """
+        Print information about the current state of the B-Raman controller.
+
+        Args:
+            module (str, optional): Specific module to home. If None, all
+            modules are homed.
+        """
+        modules_to_home = [module] if module else \
+            self._module_attributes.keys()
+
+        print('\n---------------------')
+        print('---------------------')
+        print("B Raman Controller Information:")
+        for module_key in modules_to_home:
+            module_attr = self._module_attributes.get(module_key)
+            if module_attr:
+                module_instance = getattr(self, module_attr)
+                if module_instance:
+                    if hasattr(module_instance, 'print_info'):
+                        module_instance.print_info()
+                    else:
+                        print(f"{module_key} does not support print_info.")
+        print('---------------------')
+        print('---------------------\n')
+
+    def get_exc_power_mW(self):
+        return self.exc_power_mW
+
+    def get_objetive(self):
+        return self.objective
+
+    def get_exc_wl_nm(self):
+        return self.exc_wl_nm
+
+    def set_exc_power_mW(self, exc_power_mW, verbose=True):
+        self.exc_power_mW = exc_power_mW
+        if verbose:
+            print(f'Excitation power has been set to {self.exc_power_mW} mW')
+
+    def set_objetive(self, objective, verbose=True):
+        self.objective = objective
+        self.set_objective_metadata(update_all=False)
+        if verbose:
+            print(f'Objective has been set to {self.objective}')
+
+    def set_tube_lens(self, tube_lens, verbose=True):
+        self.tube_lens = tube_lens
+        if verbose:
+            print(f'Tube Lens has been set to {self.tube_lens}')
+
+    def set_xy_stage(self, config):
+        self.set_modules(config['xy_stage'])
+
+    def set_z_stage(self, config):
+        self.set_modules(config['z_stage'])
+
+    def set_spectrometer(self, config):
+        self.set_modules(config['spectrometer'])
+
+    def set_camera(self, config):
+        self.set_modules(config['camera'])
+
+    def set_excitation_power_mW(self, exc_power_mW, verbose=True):
+        self.exc_power_mW = exc_power_mW
+        if verbose:
+            print(f'Excitation power has been set to {self.exc_power_mW} mW')
+
+    def set_excitation_wl_nm(self, exc_wl_nm, verbose=True):
+        if exc_wl_nm:
+            self.exc_wl_nm = exc_wl_nm
+        else:
+            msg = 'Please enter laser excitation wavelength in nm: '
+            exc_wl_nm = input(msg)
+            self.exc_wl_nm = float(exc_wl_nm)
+        if verbose:
+            print(f'Excitation wavelength has been set to {self.exc_wl_nm} nm')
+
+    def get_image_size_um(self):
+        return self.imaging_metadata['Image_Size']
+
+    def get_metadata(self):
+        return self.metadata
+
+    def get_image_metadata(self):
+        image_metadata = dict(
+            Position=self.get_position(),
+            Image_size=self.imaging_metadata['Image_Size']
+        )
+        return image_metadata
+
+    def get_spectrum_df(self):
+        return self.spectrometer.get_spectrum_df()
+
+    def set_spectro_metadata(self, update_all=True, verbose=False):
+        self.spectro_metadata = self.spectrometer.get_metadata()
+        if verbose:
+            print(self.spectro_metadata)
+        if update_all:
+            self.set_metadata(set_all=False)
+
+    def save_spectrum_csv(
+        self,
+        file_name='Untitled.csv',
+        file_path=os.path.dirname(os.path.abspath(__file__))
+    ):
+        # DataFrame with spectral data:
+        df = self.get_spectrum_df()
+
+        # Update the metadata
+        self.set_metadata()
+
+        # Convert metadata dictionary to JSON
+        json_metadata = json.dumps(self.get_metadata())
+
+        # Create a new DataFrame for the metadata
+        df_metadata = pd.DataFrame({'Metadata': [json_metadata]})
+
+        # Concatenate the original DataFrame and the metadata DataFrame
+        df = pd.concat([df, df_metadata], ignore_index=True)
+
+        # Write DataFrame to CSV
+        df.to_csv(os.path.join(file_path, file_name), index=False)
+
+        return None
+
+    def read_spectrum_csv(self, file_name):
+        # Read DataFrame from CSV
+        df_data = pd.read_csv(file_name)
+
+        # Extract the metadata JSON string and convert to a dictionary
+        # Get last row of Metadata column
+        metadata_json = df_data.iloc[-1, df_data.columns.get_loc('Metadata')]
+        metadata_dict = json.loads(metadata_json)
+
+        # Remove the metadata row from the DataFrame
+        df_data = df_data.drop(df_data.tail(1).index)
+        # Remove the metadata column from the DataFrame
+        df_data = df_data.drop("Metadata", axis=1)
+
+        return df_data, metadata_dict
+
+    def move(
+        self, pos, relative=False, retract=False, units=None, verbose=False
+    ):
+        if units is None:
+            units = self.units
+        else:
+            if len(units) != 3:
+                raise Exception('The units provided are not three!!')
+        if retract:
+            self.retract_Z()
+        self.XY_stage.move(
+            target_pos=pos[0:2], relative=relative, units=units[0:2],
+            verbose=verbose
+        ) 
+        self.Z_stage.move(
+            0, pos[2], relative=relative, unit=units[2], verbose=verbose
+        )
+        time.sleep(0.25)
+        if verbose:
+            time.sleep(.25)
+            print(f'B Raman in position {self.get_position()}')
+
+    def move_XY(
+        self, pos, relative=False, retract=False, units=None, verbose=False
+    ):
+        if units is None:
+            units = self.units[0:2]
+        if len(pos) == 2:
+            pass
+        elif len(pos) > 3:
+            # Ensure that we only take the first two
+            pos = pos[0:2]
+            print(
+                'The position has more than two values, only the first have ' +
+                'been considered for the motion be considered.'
+            )
+        else:
+            raise Exception(
+                'The position has less than two values, the XY motion cannot '
+                'be performed.'
+            )
+        if retract:
+            if self.Z_stage:
+                self.retract_Z()
+                # TODO -> Integrate that as input
+                self.XY_stage.move(
+                    target_pos=pos, relative = relative, units = units,
+                    verbose=verbose
+                )
+                time.sleep(0.25)
+            else:
+                while True:
+                    answer = str(input(f'No Z_stage has been initialized, the stage cannot retracted. '
+                                  f'Do you want to move without retract? (y/n)')).lower().strip()
+                    if answer[0] == 'y' or answer[0] == 'Y':
+                        self.XY_stage.move(target_pos=pos, relative = relative, units = units, verbose=verbose)  # TODO -> Integrate that as input
+                        time.sleep(0.25)
+                        break
+                    elif answer[0] == 'n' or answer[0] == 'N':
+                        while True:
+                            terminate = str(input(f'Do you want to move terminate the program? (y/n)')).lower().strip()
+                            if terminate[0] == 'y' or terminate[0] == 'Y':
+                                self.close()
+                                break
+                            elif terminate[0] == 'n' or terminate[0] == 'N':
+                                break
+                            else:
+                                print("Invalid input. Please enter 'y' or 'n'.")
+                        break
+                    else:
+                        print("Invalid input. Please enter 'y' or 'n'.")
+        else:
+            self.XY_stage.move(target_pos=pos, verbose=verbose)  # TODO -> Integrate that as input
+            time.sleep(0.25)
+        if verbose:
+            time.sleep(.25)
+            print(f"B Raman in position {self.get_position()}")
+
+
+    # def move_Z(self, pos, relative = False, unit=None, verbose = False):
+    #     if unit is None:
+    #         unit = self.units[2]
+    #     self.Z_stage.move(pos, relative = relative, unit=unit, verbose = verbose) 
+    #     time.sleep(0.05)
+    #     if verbose:
+    #         print(f"B Raman in position {self.get_position()}")
+
+
+    # def move_DZ(self, dZ, unit=None, verbose = False):
+    #     if unit is None:
+    #         unit = self.units[2]
+    #     self.move_Z(dZ, relative = True, unit=unit, erbose = verbose) 
+
+
+    # def retract_Z(self, verbose = False):
+    #     self.Z_stage.retract(verbose=verbose)
+
+
+    # def set_retract_Z(self, retract_pos=None, relative=False, unit=None, verbose = False):
+    #     if unit is None:    
+    #         unit = self.units[2]
+    #     if retract_pos is None:
+    #         retract_pos = self.get_Z_position()
+    #     self.Z_stage.set_retract(retract_pos=retract_pos, relative=relative, unit=unit, verbose = verbose)
+
+    # def get_Z_position(self):
+    #     if self.Z_stage:
+    #         return self.Z_stage.get_position()
+    #     else:
+    #         raise Exception('No Z stage has been defined.')
+
+    # def get_XY_position(self):
+    #     pos = np.array([None, None])
+    #     if self.XY_stage:
+    #         pos[0] = self.XY_stage.get_position()[0]
+    #         pos[1] = self.XY_stage.get_position()[1]  # TODO -> fix this I think is pos[0:2]
+    #         return pos
+    #     else:
+    #         raise Exception('No XY stage has been defined.')
+
+    # def camera_live(self, root = None):
+    #     self.camera.live_image(root)
+
+    # def get_image(self, color=True):
+    #     return self.camera.get_image(color=color)
+
+    # def save_image(self, name, format = 'png', folder_path = '', w_metadata = True):
+    #     if w_metadata:
+    #         return self.camera.save_image(name=name, format=format, path=folder_path, metadata_dict = self.get_image_metadata())
+    #     else:
+    #         return self.camera.save_image(name=name, format=format, path=folder_path)
+
+    # def read_image(self, image_path):
+    #     return self.camera.read_image(image_path)
+
+    # def show_spectrum(self):
+    #     # TODO -> Improve graphics
+    #     self.get_spectrum_df().plot(x='Raman Shift [cm-1]', y='Intensity', kind='line')
+    #     plt.show()
 
 
 if __name__ == '__main__':
     # Test the BRamanController class
     print('Testing BRamanController class...')
     brc = BRamanController(simulated=True)
+    brc.print_info()
+    brc.close(verbose=True)
