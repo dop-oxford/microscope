@@ -20,7 +20,7 @@ class _GenericStageAxis(microscope.abc.StageAxis):
     # or if we put it on the Stage components then we can scrap this baseclass entirely and use a generic StageAxis class.
     def __init__(self, conn: microscope.abc.Controller, name, limits=[-10000, 10000]):
         super().__init__()
-        self._position=0
+        self._position= limits[0]+(limits[1]-limits[0])/2
         self._limits = limits
         
     # TODO: This functionality all exists from alvaros code: see below, the relevant stuff just needs ported over to the right call signatures above.
@@ -124,8 +124,8 @@ class BRamanXYStage(microscope.abc.Stage):
         # TODO: I am reusing the _BRamanZStageAxis class here, but this should be a different
         # class for the XY stage OR it should be named _BRamanStageAxis, lean towards the latter.
         self._axes = {
-            "X": _GenericStageAxis(self.conn, "X", limits=[0, 50000]),
-            "Y": _GenericStageAxis(self.conn, "Y", limits=[0, 50000])
+            "X": _GenericStageAxis(self.conn, "X", limits=[4000, 25000]),
+            "Y": _GenericStageAxis(self.conn, "Y", limits=[0, 12500])
         }
         print(self.axes)
     # repeat the same method overloads as zstage.
