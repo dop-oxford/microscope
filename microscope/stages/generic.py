@@ -18,17 +18,18 @@ class _GenericStageAxis(microscope.abc.StageAxis):
     # device manufacturer, we just call the corresponding controller method.
     # TODO: There is the larger question if we want any custom code on here, (i.e. the move by um stuff)
     # or if we put it on the Stage components then we can scrap this baseclass entirely and use a generic StageAxis class.
-    def __init__(self, conn: microscope.abc.Controller, name, limits=[-10000, 10000]):
+    def __init__(self, controller: microscope.abc.Controller, name, limits=[-10000, 10000]):
         super().__init__()
         self._position= limits[0]+(limits[1]-limits[0])/2
         self._limits = limits
+        self.controller = controller
         
     # TODO: This functionality all exists from alvaros code: see below, the relevant stuff just needs ported over to the right call signatures above.
     def move_by(self, delta: float):
         # move the device by a certain amount
         self._position += delta
         # TODO: we will be calling actual methods on the controller classes here and for each of the similar methods.
-        self.conn.move_to(delta, self.channel)
+        # self.controller.move_to(delta, self.channel)
     def move_to(self, pos: float):
         # move the device to a certain position
         self._position = pos

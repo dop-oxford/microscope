@@ -15,10 +15,10 @@ import sys
 
 import numpy as np
 
-from tl_camera_enums import EEP_STATUS, DATA_RATE, SENSOR_TYPE, OPERATION_MODE, COMMUNICATION_INTERFACE, \
+from .tl_camera_enums import EEP_STATUS, DATA_RATE, SENSOR_TYPE, OPERATION_MODE, COMMUNICATION_INTERFACE, \
     USB_PORT_TYPE, TRIGGER_POLARITY, TAPS
-from tl_color_enums import FILTER_ARRAY_PHASE
-from tl_polarization_enums import POLAR_PHASE
+from .tl_color_enums import FILTER_ARRAY_PHASE
+from .tl_polarization_enums import POLAR_PHASE
 
 """ Setup logger """
 _logger = logging.getLogger('thorlabs_tsi_sdk.tl_camera')

@@ -6,24 +6,6 @@ import sys
 import os
 from pathlib import Path
 
-# Camera PATHs
-resources_path = os.path.join(Path(__file__).resolve().parents[5], 'resources')
-is_64bits = sys.maxsize > 2**32
-camera_path = os.path.join(resources_path, 'CS165CU_Camera_Files')
-path_to_camera_dlls = os.path.join(camera_path, 'dlls')  # Camera dlls
-path_to_camera_source = os.path.join(camera_path, 'source')  # Camera Source Code
-print(f"Camera PATHs: {path_to_camera_dlls}, {path_to_camera_source}")
-path_to_camera_dlls = os.path.join(path_to_camera_dlls, '64_lib') if is_64bits else os.path.join(path_to_camera_dlls, '32_lib')
-os.environ['PATH'] = path_to_camera_dlls + os.pathsep + os.environ['PATH']
-sys.path.insert(1, path_to_camera_source)
-# os.environ['PATH'] = absolute_path_to_source + os.pathsep + os.environ['PATH']
-try:
-    # Python 3.8 introduces a new method to specify dll directory
-    os.add_dll_directory(path_to_camera_dlls)
-except AttributeError:
-    pass
-print(f"CS165CU Camera PATHs configured successfully")
-
 from microscope.cameras._thorlabs.tl_camera import TLCameraSDK, TLCamera, Frame, OPERATION_MODE, ROI
 from microscope.cameras._thorlabs.tl_camera_enums import SENSOR_TYPE
 from microscope.cameras._thorlabs.tl_mono_to_color_processor import MonoToColorProcessorSDK
@@ -37,10 +19,9 @@ from PIL import Image, ImageTk, PngImagePlugin
 import typing
 import threading
 import queue
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as pl
 
-
-class CS165CUCamera:
+class CS165CUCamera(microscope.abc.Camera):
     """
     Class to control the Thorlabs CS165CU Camera
 
@@ -94,20 +75,35 @@ class CS165CUCamera:
         camera_GUI(root, dispose): Starts camera GUI
 
     """
-
     def __init__(self,
                  camera_number=None,  # The number in the list of cameras of the camera we want to get
                  camera_name=None,  # Name of camera
                  ini_acq=False,  # Whether to initialize the acquisition with the default values
                  verbose=True,  # If True, info in printed in terminal
-                 very_verbose=False):  # If True, more info in printed in terminal
+                 very_verbose=False,
+                 simulated=False):  # If True, more info in printed in terminal
+        super().__init__()
+        self.add_setting("example_setting", "str", lambda x: None, lambda x: None, lambda x: x)
+        # TODO: this obviously needs a proper solution:
+        os.add_dll_directory("C:\Program Files\Thorlabs\Scientific Imaging\ThorCam")
+        if simulated:
+            self.simulated = True
+        self._is_color = False # TODO: This is a hack that needs removed later.
         self.verbose = verbose
         self.very_verbose = very_verbose
-        self.sdk = TLCameraSDK()
         self.camera_name = camera_name
-        self.camera_list = self.sdk.discover_available_cameras()
+        try: # TODO: This is a hack that needs removed later.
+            self.sdk = TLCameraSDK()
+            self.camera_list = self.sdk.discover_available_cameras()
+        except:
+            self.sdk = {}
+            self.camera_list = None
+
         if not self.camera_list:
-            raise Exception("No cameras have been found")
+            self.simulated = True
+            self.camera = {}
+            warnings.warn("No cameras have been found")
+            return
 
         if camera_number:
             self.camera = self.sdk.open_camera(self.camera_list[camera_number])
@@ -147,37 +143,10 @@ class CS165CUCamera:
         if self.very_verbose:
             self.print_info()
 
-    # --- Camera information functions ---
-    def print_info(self):
-        """Prints camera information to terminal."""
-        print(f'\n{self.camera.name}: ')
-        print(f'Serial number: {self.camera.serial_number}')
-        print('----')
-        print(f'Sensor type: {self.camera.camera_sensor_type}')
-        print(f'Pixel size of sensor in bytes: {self.camera.sensor_pixel_size_bytes}')
-        print(f'Sensor pixel size (HxW): {self.camera.sensor_pixel_height_um}um x {self.camera.sensor_pixel_width_um}um')
-        print(f'Sensor bit depth: {self.camera.bit_depth}')
-        print('----')
-        print(f'Region of interest (ROI): {self.camera.roi}')
-        print(f'ROI range: {self.camera.roi_range}')
-        print(f'Image size: (HxW): {self.camera.image_height_pixels} x {self.camera.image_width_pixels} pixels')
-        print('----')
-        print(f'Frame rate control is enabled: {self.camera.is_frame_rate_control_enabled}')
-        print(f'Frame rate control value: {self.camera.frame_rate_control_value}')
-        print('----')
-        print(f'Gain: {self.camera.gain}')
-        print(f'Black level: {self.camera.black_level}')
-        print(f'Black level range: {self.camera.black_level_range}')
-        print('----')
-        print(f'Vertical binning value: {self.camera.biny}')
-        print(f'Vertical binning value range: {self.camera.biny_range}')
-        if self._is_color:
-            print('-----')
-            self.get_color_processor_properties(verbose=True)
-            print('-----')
-
-    def dispose(self):
+    def _do_shutdown(self):
         """Cleans up the TLCameraSDK and TLCamera instances."""
+        if self.simulated:
+            return
         if self._is_color:
             try:
                 self.mono_to_color_processor.dispose()
@@ -195,6 +164,11 @@ class CS165CUCamera:
             self.sdk.dispose()
         except Exception as exception:
             print(f"Unable to dispose TLCamera_SDK: {exception}")
+    
+    def abort():
+        """Aborts the camera acquisition."""
+        # TODO: work out how to do this.
+        pass
 
     def rename_camera(self, camera_name):
         """Renames the camera.
@@ -210,7 +184,8 @@ class CS165CUCamera:
         if self.verbose:
             print(f"Camera name has been set to {camera_name}.")
 
-    def get_sensor_pixel_size(self):
+    # NOTE: This has been renamed from get_sensor_pixel_size
+    def _get_sensor_shape(self):
         """Returns sensor dimensions in pixels.
 
         Returns:
@@ -354,6 +329,14 @@ class CS165CUCamera:
                 f"Camera number of frames generated per software or hardware trigger have been set to {frames_per_trigger_zero_for_unlimited}."
             )
 
+    def set_exposure_time(self, exposure_time):
+        """Sets camera exposure time in seconds.
+
+        Args:
+            exposure_time (float): Camera exposure time in seconds.
+        """
+        self.set_exposure_time_us(exposure_time * 1e6)
+
     def set_exposure_time_us(self, exposure_time_us):
         """Sets camera exposure time in microseconds.
 
@@ -367,8 +350,26 @@ class CS165CUCamera:
             self.dispose()
         if self.verbose:
             print(f"Camera exposure time has been set to {exposure_time_us} us.")
+    
+    def _get_binning(self):
+        """Returns the binning of the camera."""
+        # TODO: implement this using get_binx / biny from the SDK.
+        return
+    
+    def _set_binning(self):
+        """Returns the binning of the camera."""
+        # TODO: implement this using binx / biny setter from the SDK.
+        return
+    def set_trigger(self, trigger_mode):
+        """set the trigger mode of the camera."""
+        # TODO: I think this might be called operation mode on the tlcamera
+        pass
+    def trigger_mode(self):
+        pass
+    def trigger_type(self):
+        pass
 
-    def set_roi(self, roi):
+    def _set_roi(self, roi):
         """Sets camera region of interest.
 
         Args:
@@ -382,7 +383,7 @@ class CS165CUCamera:
             print(f"Encountered error: {error}, region of interest could not be set to {roi}.")
             self.dispose()
 
-    def get_roi(self):
+    def _get_roi(self):
         """Gets camera region of interest.
 
         Returns:
@@ -401,7 +402,7 @@ class CS165CUCamera:
                 print(f"Encountered error: {error}, camera could not be set to continuous mode.")
                 self.dispose()
 
-    def initialize_acquisition(self, exp_time_us=11000, poll_timeout_ms=1000, verbose=False):
+    def _do_trigger(self, exp_time_us=11000, poll_timeout_ms=1000, verbose=False):
         """Initializes camera acquisition with specified parameters."""
         if verbose:
             print(f"Initializing {self.camera_name} camera acquisition")
@@ -433,7 +434,7 @@ class CS165CUCamera:
         if disarm:
             self.camera.disarm()
 
-    def get_image(self, rescale=False, target_bpp=8):
+    def _fetch_data(self, rescale=False, target_bpp=8):
         """Gets an image from the camera.
 
         Args:
@@ -443,6 +444,8 @@ class CS165CUCamera:
         Returns:
             Image: PIL Image object.
         """
+        if self.simulated:
+            return Image.fromarray(np.random.randint(0, 255, (512, 512), dtype=np.uint8))
         frame = self.get_frame()
         if rescale:
             # Bitwise right shift to scale down image
@@ -724,53 +727,9 @@ class ImageAcquisitionThread(threading.Thread):
                 print("Encountered error: {error}, image acquisition will stop.".format(error=error))
                 break
         print("Image acquisition has stopped")
-    
-        
-if __name__ == '__main__':
-    camera_controller = CS165CUCamera(ini_acq=True, verbose=True, very_verbose=True)
-    print(camera_controller.get_metadata())
-    print(camera_controller.get_sensor_size_um())
-        # Test live streaming
-    reply = str(input(f'Do you want to test live streaming? (y/n)')).lower().strip()
-    if reply[0] == 'y':
-        camera_controller.live_image(dispose=False)
 
-    # Test capture one frame
-    reply = str(input(f'Do you want to capture one frame? (y/n)')).lower().strip()
-    if reply[0] == 'y':
-        plt.imshow(camera_controller.get_color_image())
-        plt.show()
 
-    # Test capture of color image
-    reply = str(input(f'Do you want to save a color image? (y/n)')).lower().strip()
-    if reply[0] == 'y':
-        camera_controller.save_color_image(img_name='test_CS165CU', color_transformation='24')
-
-    # Test capture of color image with metadata
-    reply = str(input(f'Do you want to save a color image with metadata? (y/n)')).lower().strip()
-    if reply[0] == 'y':
-        # Create metadata
-        metadata_dict = {
-            'array': [12.34, 56.78, 90.12],
-            'integer': 123,
-            'float': 45.67
-        }
-        camera_controller.save_color_image(img_name='test_CS165CU', color_transformation='24',
-                                        metadata_dict=metadata_dict)
-
-    # Test retrieve color image with metadata
-    reply = str(input(f'Do you want to retrieve the color image with metadata? (y/n)')).lower().strip()
-    if reply[0] == 'y':
-        # Open the image
-        img, metadata = camera_controller.read_color_image('test_CS165CU.png')
-        print(metadata)
-        plt.imshow(img)
-        plt.show()
-
-    # Close camera
-    camera_controller.dispose()
-
-class CS165CUBRCamera(microscope.abc.Camera):
+class CS165CUBRCamera(CS165CUCamera):
     """
     Raman camera controller for the Thorlabs CS165CU camera.
 
@@ -789,7 +748,7 @@ class CS165CUBRCamera(microscope.abc.Camera):
     def __init__(self, config):
         #self.config = config
         #self.name = self.config.get("name", "CS165CU")
-        BRamanCamera.__init__(self, config)
+        super().__init__(self, config)
         camera_number = self.config.get("camera_number", None)
         ini_acq = self.config.get("ini_acq", False)
         verbose = self.config.get("verbose", False)
@@ -797,23 +756,7 @@ class CS165CUBRCamera(microscope.abc.Camera):
         CS165CUCamera.__init__(self, camera_number=camera_number, ini_acq=ini_acq, 
                                verbose=verbose, very_verbose=very_verbose)
 
-    def print_info(self):
-        """Prints information about the camera."""
-        CS165CUCamera.print_info(self)
-
-    def get_metadata(self):
-        """Retrieves camera metadata."""
-        return CS165CUCamera.get_metadata(self)
-
-    def get_sensor_size_um(self):
-        """Gets the sensor size in micrometers."""
-        return CS165CUCamera.get_sensor_size_um(self)
-
-    def live_image(self, root=None):
-        """Displays live view of the camera feed."""
-        CS165CUCamera.live_image(self, root=root)
-
-    def get_image(self, color=True):
+    def _fetch_data(self, color=True):
         """Acquires a color image from the camera. 
 
         Args:
@@ -835,9 +778,7 @@ class CS165CUBRCamera(microscope.abc.Camera):
             verbose (bool): If True, enables verbose output during the operation.
 
         """
-        CS165CUCamera.dispose(self)
-        if verbose:
-            print(f"Camera {self.name} closed.")
+        super().dispose(self)
 
     def _initialize(self, verbose=True):
         """
@@ -851,18 +792,9 @@ class CS165CUBRCamera(microscope.abc.Camera):
         """
         if verbose:
             print(f"Initializing camera {self.name}...")
-        CS165CUCamera.initialize_acquisition(self, exp_time_us=11000, poll_timeout_ms=1000, verbose=True)
+        super().initialize_acquisition(self, exp_time_us=11000, poll_timeout_ms=1000, verbose=True)
         if verbose:
             print(f"Camera {self.name} INITIALIZED.")
-
-    def set_exposure_time_us(self, exposure_time): 
-        """
-        Sets the exposure time in microseconds.
-        
-        Args:
-            exposure_time (int): The exposure time in microseconds.
-        """
-        CS165CUCamera.set_exposure_time_us(self, exposure_time)
 
     def set_gain_dB(self, gain):
         """
@@ -872,3 +804,7 @@ class CS165CUBRCamera(microscope.abc.Camera):
             gain (float): The gain value in dB.
         """ 
         warnings.warn("CSU165 camera cannot gain method not defined!")
+
+if __name__ == "__main__":
+    camera = CS165CUCamera(simulated=True)
+    print(camera._fetch_data())

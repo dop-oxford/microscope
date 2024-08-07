@@ -130,7 +130,8 @@ class MCM3000Controller(microscope.abc.Controller):
                 # TODO: This kind of could could be used to initiate this class, probably want an entire rework though.
                 if stage == 'ZFM2020':
                     limits  = self.supported_stages[stage]["limits"]
-                    conversion = self.supported_stages[stage]["conversion"]
+                    conversion = self.supported_stages[stage]["conversion"]#
+                    # TODO: This is not correct, we want to make controller and then pass the instance to the stage rather than making the stage in the controller instance
                     device = ZFM2020Stage(limits=limits, conversion=conversion, channel=channel, port=self.port)
                     self._devices[str(channel)] = device
 

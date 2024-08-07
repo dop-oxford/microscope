@@ -292,7 +292,7 @@ class XimeaCamera(microscope.abc.Camera):
             width=self._sensor_shape[0],
             height=self._sensor_shape[1],
         )
-        self.set_roi(self._roi)
+        self._set_roi(self._roi)
 
         self.set_trigger(
             microscope.TriggerType.SOFTWARE, microscope.TriggerMode.ONCE

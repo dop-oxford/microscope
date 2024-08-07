@@ -10,9 +10,9 @@ import platform
 
 import numpy as np
 
-from tl_color_enums import FORMAT, FILTER_ARRAY_PHASE
-from tl_camera_enums import SENSOR_TYPE
-from tl_mono_to_color_enums import COLOR_SPACE
+from .tl_color_enums import FORMAT, FILTER_ARRAY_PHASE
+from .tl_camera_enums import SENSOR_TYPE
+from .tl_mono_to_color_enums import COLOR_SPACE
 
 """ Setup logger """
 _logger = logging.getLogger('thorlabs_tsi_sdk.tl_mono_to_color_processor')
