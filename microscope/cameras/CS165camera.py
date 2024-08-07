@@ -2,24 +2,40 @@ import warnings
 import microscope.abc
 
 import warnings
-import sys
 import os
 from pathlib import Path
+import logging
+import time
 
 from microscope.cameras._thorlabs.tl_camera import TLCameraSDK, TLCamera, Frame, OPERATION_MODE, ROI
 from microscope.cameras._thorlabs.tl_camera_enums import SENSOR_TYPE
 from microscope.cameras._thorlabs.tl_mono_to_color_processor import MonoToColorProcessorSDK
 from microscope.cameras._thorlabs.tl_mono_to_color_enums import COLOR_SPACE
 from microscope.cameras._thorlabs.tl_color_enums import FORMAT
+from microscope.simulators import _ImageGenerator
 import numpy as np
 import os
 import json
-import tkinter as tk
-from PIL import Image, ImageTk, PngImagePlugin
-import typing
+from PIL import Image, PngImagePlugin
 import threading
 import queue
-import matplotlib.pyplot as pl
+
+_logger = logging.getLogger(__name__)
+
+# TODO: This needs serious investigation, I am just using another piece of code but i cant find similar code in SDK
+# NOTE(ADW): The rising edge seems to be trigger polarity on the SDK and the TLCAMERA.operation_mode is trigger 
+# mode, se we should be passing these tuples to those setters respectively.
+SDK3_STRING_TO_TRIGGER = {
+    "external": (
+        microscope.TriggerType.RISING_EDGE,
+        microscope.TriggerMode.ONCE,
+    ),
+    "external exposure": (
+        microscope.TriggerType.RISING_EDGE,
+        microscope.TriggerMode.BULB,
+    ),
+    "software": (microscope.TriggerType.SOFTWARE, microscope.TriggerMode.ONCE),
+}
 
 class CS165CUCamera(microscope.abc.Camera):
     """
@@ -83,11 +99,51 @@ class CS165CUCamera(microscope.abc.Camera):
                  very_verbose=False,
                  simulated=False):  # If True, more info in printed in terminal
         super().__init__()
-        self.add_setting("example_setting", "str", lambda x: None, lambda x: None, lambda x: x)
+        self._gain = 0
+        self.add_setting(
+            "gain",
+            "int",
+            lambda: self._gain,
+            self._set_gain,
+            lambda: (0, 8192),
+        )
+        
         # TODO: this obviously needs a proper solution:
         os.add_dll_directory("C:\Program Files\Thorlabs\Scientific Imaging\ThorCam")
+        # TODO: we can't hard set the trigger mode really
+        self._trigger_mode = "software"
+        self._acquiring = False
+        self._triggered = 0
+        self._sent = 0
         if simulated:
             self.simulated = True
+            self._image_generator = _ImageGenerator()
+            sensor_shape = (512, 512)
+            self._sensor_shape = sensor_shape
+            self._roi = microscope.ROI(0, 0, *sensor_shape)
+            self._binning = microscope.Binning(1, 1)
+            self._exposure_time = 0.1
+            self.add_setting(
+            "image pattern",
+            "enum",
+            self._image_generator.method,
+            self._image_generator.set_method,
+            self._image_generator.get_methods,
+            )
+            self.add_setting(
+                "image data type",
+                "enum",
+                self._image_generator.data_type,
+                self._image_generator.set_data_type,
+                self._image_generator.get_data_types,
+            )
+            self.add_setting(
+                "display image number",
+                "bool",
+                lambda: self._image_generator.numbering,
+                self._image_generator.enable_numbering,
+                None,
+            )
         self._is_color = False # TODO: This is a hack that needs removed later.
         self.verbose = verbose
         self.very_verbose = very_verbose
@@ -140,8 +196,26 @@ class CS165CUCamera(microscope.abc.Camera):
         # Set metadata information
         self.set_metadata()
 
-        if self.very_verbose:
-            self.print_info()
+    def _do_enable(self):
+        _logger.info("Preparing for acquisition.")
+        if self._acquiring:
+            self.abort()
+        self._acquiring = True
+        self._sent = 0
+        _logger.info("Acquisition enabled.")
+        return True
+    
+    # TODO: This is placeholder code
+    def get_cycle_time(self) -> float:
+        return 1.0
+    # TODO: This is placeholder code, these methods must exist on the sdk
+    def get_exposure_time(self) -> float:
+        return 0.1
+    # TODO: cant imagine this wont need more work 
+    def soft_trigger(self):
+        self._do_trigger()
+    def get_roi(self):
+        return self._roi
 
     def _do_shutdown(self):
         """Cleans up the TLCameraSDK and TLCamera instances."""
@@ -165,10 +239,10 @@ class CS165CUCamera(microscope.abc.Camera):
         except Exception as exception:
             print(f"Unable to dispose TLCamera_SDK: {exception}")
     
-    def abort():
+    def abort(self):
         """Aborts the camera acquisition."""
-        # TODO: work out how to do this.
-        pass
+        # TODO: work out how to do this. I suspect it is with disarm
+        self.camera.disarm()
 
     def rename_camera(self, camera_name):
         """Renames the camera.
@@ -343,6 +417,8 @@ class CS165CUCamera(microscope.abc.Camera):
         Args:
             exposure_time_us (int): Camera exposure time in us.
         """
+        if self.simulated:
+            return
         try:
             self.camera.exposure_time_us = exposure_time_us
         except Exception as error:
@@ -362,12 +438,18 @@ class CS165CUCamera(microscope.abc.Camera):
         return
     def set_trigger(self, trigger_mode):
         """set the trigger mode of the camera."""
-        # TODO: I think this might be called operation mode on the tlcamera
-        pass
-    def trigger_mode(self):
-        pass
+        # TODO: this probabely is not right
+        self._trigger_mode = trigger_mode
+
+    @property
+    def trigger_mode(self) -> microscope.TriggerMode:
+        trigger_string = self._trigger_mode.lower()
+        return SDK3_STRING_TO_TRIGGER[trigger_string][1]
+    
+    @property
     def trigger_type(self):
-        pass
+        trigger_string = self._trigger_mode.lower()
+        return SDK3_STRING_TO_TRIGGER[trigger_string][0]
 
     def _set_roi(self, roi):
         """Sets camera region of interest.
@@ -375,6 +457,8 @@ class CS165CUCamera(microscope.abc.Camera):
         Args:
             roi (tuple): Region of interest (x, y, width, height).
         """
+        if self.simulated:
+            return
         try:
             self.camera.roi = roi
             if self.verbose:
@@ -382,6 +466,10 @@ class CS165CUCamera(microscope.abc.Camera):
         except Exception as error:
             print(f"Encountered error: {error}, region of interest could not be set to {roi}.")
             self.dispose()
+    
+    # TODO: This is simulated stuff.
+    def _set_gain(self, value):
+        self._gain = value
 
     def _get_roi(self):
         """Gets camera region of interest.
@@ -389,10 +477,14 @@ class CS165CUCamera(microscope.abc.Camera):
         Returns:
             tuple: Region of interest (x, y, width, height).
         """
+        if self.simulated:
+            return (0, 0, 512, 512)
         return self.camera.roi
 
     def set_continuous_mode(self):
         """Sets camera to continuous mode."""
+        if self.simulated:
+            return
         if self.camera.frames_per_trigger_zero_for_unlimited != 0:
             try:
                 self.set_frames_per_trigger_zero_for_unlimited(0)  # start camera in continuous mode
@@ -404,6 +496,9 @@ class CS165CUCamera(microscope.abc.Camera):
 
     def _do_trigger(self, exp_time_us=11000, poll_timeout_ms=1000, verbose=False):
         """Initializes camera acquisition with specified parameters."""
+        self._triggered += 1
+        if self.simulated:
+            return
         if verbose:
             print(f"Initializing {self.camera_name} camera acquisition")
         self.set_exposure_time_us(exp_time_us)  # set exposure in us
@@ -444,15 +539,29 @@ class CS165CUCamera(microscope.abc.Camera):
         Returns:
             Image: PIL Image object.
         """
-        if self.simulated:
-            return Image.fromarray(np.random.randint(0, 255, (512, 512), dtype=np.uint8))
-        frame = self.get_frame()
-        if rescale:
-            # Bitwise right shift to scale down image
-            image = frame.image_buffer >> (self.camera.bit_depth - target_bpp)
-        else:
-            image = frame.image_buffer
-        return Image.fromarray(image)
+        if self._acquiring and self._triggered > 0:
+            _logger.info("Sending image")
+            time.sleep(self._exposure_time)
+            if self.simulated:
+                dark = int(32 * np.random.rand())
+                light = int(255 - 128 * np.random.rand())
+                width = self._roi.width // self._binning.h
+                height = self._roi.height // self._binning.v
+                image = self._image_generator.get_image(
+                    width, height, dark, light, index=self._sent
+                )
+                self._sent += 1
+                self._triggered -= 1
+                return image
+            frame = self.get_frame()
+            if rescale:
+                # Bitwise right shift to scale down image
+                image = frame.image_buffer >> (self.camera.bit_depth - target_bpp)
+            else:
+                image = frame.image_buffer
+            self._sent += 1
+            self._triggered
+            return Image.fromarray(image)
 
     def get_raw_color_image(self, transform_key="48", reshape=True):
         """Gets a raw color image from the camera.
@@ -745,16 +854,11 @@ class CS165CUBRCamera(CS165CUCamera):
 
     """
 
-    def __init__(self, config):
+    def __init__(self, **kwargs):
         #self.config = config
         #self.name = self.config.get("name", "CS165CU")
-        super().__init__(self, config)
-        camera_number = self.config.get("camera_number", None)
-        ini_acq = self.config.get("ini_acq", False)
-        verbose = self.config.get("verbose", False)
-        very_verbose = self.config.get("very_verbose", False)
-        CS165CUCamera.__init__(self, camera_number=camera_number, ini_acq=ini_acq, 
-                               verbose=verbose, very_verbose=very_verbose)
+        # TODO: reinstate configuration
+        super().__init__(self, **kwargs)
 
     def _fetch_data(self, color=True):
         """Acquires a color image from the camera. 
@@ -767,6 +871,9 @@ class CS165CUBRCamera(CS165CUCamera):
             Image: The acquired PIL Image object. 
 
         """
+        if self.simulated:
+            # TODO: these fake images can be made a single fixture and with size set by pixel size etc.
+            return Image.fromarray(np.random.randint(0, 255, (512, 512), dtype=np.uint8))
         return CS165CUCamera.get_color_image(self, transform_key="48") 
 
     def _close(self, force= False, verbose=True): 
@@ -807,4 +914,6 @@ class CS165CUBRCamera(CS165CUCamera):
 
 if __name__ == "__main__":
     camera = CS165CUCamera(simulated=True)
+    camera2 = CS165CUBRCamera(simulated=True)
     print(camera._fetch_data())
+    print(camera2._fetch_data())
