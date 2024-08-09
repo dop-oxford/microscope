@@ -845,7 +845,7 @@ class Camera(TriggerTargetMixin, DataDevice):
         self._client_transform = (False, False, False)
         # Result of combining client and readout transforms
         self._transform = (False, False, False)
-        self.add_setting("roi", "tuple", self._get_roi, self._set_roi, None)
+        self.add_setting("roi", "tuple", self.get_roi, self.set_roi, None)
 
     def _process_data(self, data):
         """Apply self._transform to data."""
@@ -948,7 +948,7 @@ class Camera(TriggerTargetMixin, DataDevice):
         """Return the ROI as it is on hardware."""
         raise NotImplementedError()
 
-    def _get_roi(self) -> microscope.ROI:
+    def get_roi(self) -> microscope.ROI:
         """Return current ROI."""
         roi = self._get_roi()
         if self._transform[2]:
@@ -961,7 +961,7 @@ class Camera(TriggerTargetMixin, DataDevice):
         """Set the ROI on the hardware.  Return `True` if successful."""
         return False
 
-    def _set_roi(self, roi: microscope.ROI) -> None:
+    def set_roi(self, roi: microscope.ROI) -> None:
         """Set the ROI according to the provided rectangle.
 
         Return True if ROI set correctly, False otherwise.
