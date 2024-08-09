@@ -214,8 +214,6 @@ class CS165CUCamera(microscope.abc.Camera):
     # TODO: cant imagine this wont need more work 
     def soft_trigger(self):
         self._do_trigger()
-    def get_roi(self):
-        return self._roi
 
     def _do_shutdown(self):
         """Cleans up the TLCameraSDK and TLCamera instances."""
