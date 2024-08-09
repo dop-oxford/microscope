@@ -436,6 +436,8 @@ class CS165CUCamera(microscope.abc.Camera):
         """Returns the binning of the camera."""
         # TODO: implement this using binx / biny setter from the SDK.
         return
+    
+    # TODO: replace this with add sedtting
     def set_trigger(self, trigger_mode):
         """set the trigger mode of the camera."""
         # TODO: this probabely is not right
