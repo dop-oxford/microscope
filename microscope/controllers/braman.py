@@ -1,10 +1,71 @@
-"""B Raman controller."""
+"""
+B Raman controller class.
+
+Description:
+    The BRamanController class serves as the central management entity for
+    controlling various components of a B-Raman spectroscopy system. This
+    includes motor controllers for XY and Z stages, spectrometers, cameras,
+    and optical components such as objectives and tube lenses. The class is
+    designed to initialize these components based on a configurable setup,
+    facilitating easy integration and control over the entire spectroscopy
+    system. The controller supports dynamic configuration through JSON files
+    or directly via dictionaries, allowing for flexibility in specifying
+    system parameters and hardware configurations. It aims to streamline the
+    process of setting up and conducting spectroscopic analysis by providing
+    a unified interface to manage the interaction with different hardware
+    modules.
+
+Author:
+    - Álvaro Fernández Galiana (alvaro.fernandezgaliana@gmail.com)
+    - Rowan Nicholls (rowan.nicholls@dtc.ox.ac.uk)
+
+Date:
+    - 2024-04-01
+    - 2024-08-05
+
+License: TBC
+
+Notes for Future Development:
+    - Check how to add more flexibility to the modules externally without
+      having to code in the modules_methods dictionary.
+    - Address the redundancy of the modules_list.
+    - To add a module 'type', create a self.module_name and a
+      self.set_module_name method, and add the self.module_name to the
+      self._module_attributes dictionary.
+    - Allow for the units to be changed in the move method; currently, it uses
+      the default units of mm, mm, and im for X, Y, and Z, respectively.
+    - Review time.sleep to speed up the code if fast scanning is necessary.
+    - Improve file management for reading configuration files, including the
+      config_folder_path.
+    - Create a BRamanImage class to handle image processing tasks and metadata
+      extraction.
+    - Improve consistency with the initialization of the modules.
+
+Dependencies:
+    - pandas: For reading and processing CSV files containing configuration
+      data for objectives and tube lenses.
+    - numpy: For mathematical operations and data handling.
+    - matplotlib: For plotting and visualization of spectroscopic data.
+    - PIL: For image processing tasks related to the camera module.
+    - json: For loading and parsing configuration files.
+
+Usage Example:
+    ```
+    raman_controller = BRamanController()
+    raman_controller.initialize_system()
+    spectrum = raman_controller.acquire_spectrum()
+    raman_controller.plot_spectrum(spectrum)
+    ```
+"""
 from datetime import datetime
+from matplotlib import pyplot as plt
 import json
 import numpy as np
 import os
 import pandas as pd
 import sys
+import time
+import typing
 # Custom modules
 import microscope.abc
 
@@ -47,8 +108,8 @@ config = {
 print(config)
 
 
-# class BRamanController(microscope.abc.Controller):
-class BRamanController():
+class BRamanController(microscope.abc.Controller):
+    """A B Raman controller device."""
 
     def __init__(self, config=config, simulated=False):
         """Initialise a new instance of the 'B Raman controller' class."""
@@ -66,6 +127,8 @@ class BRamanController():
         self.Z_stage = None
         self.spectrometer = None
         self.camera = None
+
+        self._devices: typing.Dict[str, microscope.abc.Device] = {}
 
         self._module_attributes = {
             'xy_stage': 'XY_stage',
@@ -130,11 +193,16 @@ class BRamanController():
 
         print("All INITIALIZED")
 
+    @property
+    def devices(self) -> typing.Dict[str, microscope.abc.Device]:
+        return self._devices
+
     def initialize(self, force=False, verbose=False, module=None):
         """
-        Initializes the specified module or all set modules by calling their
-        respective initialize methods. If a module has not been set, it will be
-        skipped.
+        Initialise the specified module or all set modules.
+
+        Multiple modules can be set by calling their respective initialise
+        methods. If a module has not been set, it will be skipped.
 
         Args:
             force (bool, dict): A flag or dictionary indicating whether to
@@ -211,15 +279,16 @@ class BRamanController():
                     f'{module_type}'
                 )
 
-        elif module_type == "xy_stage":
-            stage_name = config["stage_name"]
+        elif module_type == 'xy_stage':
+            stage_name = config['stage_name']
             if (
-                stage_name.lower() == "mls203-2"
-                or stage_name.lower() == "mls2032_2"
-                or stage_name.lower() == "mls20322"
+                stage_name.lower() == 'mls203-2'
+                or stage_name.lower() == 'mls2032_2'
+                or stage_name.lower() == 'mls20322'
             ):
-                controller_name = config["controller_name"]
-                if controller_name.lower() == "bbd302":
+                controller_name = config['controller_name']
+                if controller_name.lower() == 'bbd302':
+                    print('Unimplemented')
                     # return MLS2032StageBBD302Controler(config)
                     pass
                 else:
@@ -662,6 +731,8 @@ class BRamanController():
     def move_XY(
         self, pos, relative=False, retract=False, units=None, verbose=False
     ):
+        if not self.XY_stage:
+            raise Exception('No XY stage has been defined.')
         if units is None:
             units = self.units[0:2]
         if len(pos) == 2:
@@ -675,112 +746,134 @@ class BRamanController():
             )
         else:
             raise Exception(
-                'The position has less than two values, the XY motion cannot '
+                'The position has fewer than two values, the XY motion cannot '
                 'be performed.'
             )
         if retract:
             if self.Z_stage:
                 self.retract_Z()
-                # TODO -> Integrate that as input
+                # TODO -> Integrate this as input
                 self.XY_stage.move(
-                    target_pos=pos, relative = relative, units = units,
+                    target_pos=pos, relative=relative, units=units,
                     verbose=verbose
                 )
                 time.sleep(0.25)
             else:
                 while True:
-                    answer = str(input(f'No Z_stage has been initialized, the stage cannot retracted. '
-                                  f'Do you want to move without retract? (y/n)')).lower().strip()
+                    answer = str(input(
+                        'No Z_stage has been initialized, the stage cannot '
+                        'be retracted.\n'
+                        'Do you want to move without retract? (y/n)'
+                    )).lower().strip()
                     if answer[0] == 'y' or answer[0] == 'Y':
-                        self.XY_stage.move(target_pos=pos, relative = relative, units = units, verbose=verbose)  # TODO -> Integrate that as input
+                        # TODO -> Integrate this as input
+                        self.XY_stage.move(
+                            target_pos=pos, relative=relative, units=units,
+                            verbose=verbose
+                        )
                         time.sleep(0.25)
                         break
                     elif answer[0] == 'n' or answer[0] == 'N':
                         while True:
-                            terminate = str(input(f'Do you want to move terminate the program? (y/n)')).lower().strip()
+                            terminate = str(input(
+                                'Do you want to move terminate the program? '
+                                '(y/n)'
+                            )).lower().strip()
                             if terminate[0] == 'y' or terminate[0] == 'Y':
                                 self.close()
                                 break
                             elif terminate[0] == 'n' or terminate[0] == 'N':
                                 break
                             else:
-                                print("Invalid input. Please enter 'y' or 'n'.")
+                                msg = "Invalid input. Please enter 'y' or 'n'."
+                                print(msg)
                         break
                     else:
                         print("Invalid input. Please enter 'y' or 'n'.")
         else:
-            self.XY_stage.move(target_pos=pos, verbose=verbose)  # TODO -> Integrate that as input
+            # TODO -> Integrate this as input
+            self.XY_stage.move(target_pos=pos, verbose=verbose)
             time.sleep(0.25)
         if verbose:
             time.sleep(.25)
-            print(f"B Raman in position {self.get_position()}")
+            print(f'B Raman in position {self.get_position()}')
 
+    def move_Z(self, pos, relative=False, unit=None, verbose=False):
+        if unit is None:
+            unit = self.units[2]
+        self.Z_stage.move(pos, relative=relative, unit=unit, verbose=verbose)
+        time.sleep(0.05)
+        if verbose:
+            print(f'B Raman in position {self.get_position()}')
 
-    # def move_Z(self, pos, relative = False, unit=None, verbose = False):
-    #     if unit is None:
-    #         unit = self.units[2]
-    #     self.Z_stage.move(pos, relative = relative, unit=unit, verbose = verbose) 
-    #     time.sleep(0.05)
-    #     if verbose:
-    #         print(f"B Raman in position {self.get_position()}")
+    def move_DZ(self, dZ, unit=None, verbose=False):
+        if unit is None:
+            unit = self.units[2]
+        self.move_Z(dZ, relative=True, unit=unit, verbose=verbose)
 
+    def retract_Z(self, verbose=False):
+        self.Z_stage.retract(verbose=verbose)
 
-    # def move_DZ(self, dZ, unit=None, verbose = False):
-    #     if unit is None:
-    #         unit = self.units[2]
-    #     self.move_Z(dZ, relative = True, unit=unit, erbose = verbose) 
+    def set_retract_Z(
+        self, retract_pos=None, relative=False, unit=None, verbose=False
+    ):
+        if unit is None:
+            unit = self.units[2]
+        if retract_pos is None:
+            retract_pos = self.get_Z_position()
+        self.Z_stage.set_retract(
+            retract_pos=retract_pos, relative=relative, unit=unit,
+            verbose=verbose
+        )
 
+    def get_Z_position(self):
+        if self.Z_stage:
+            return self.Z_stage.get_position()
+        else:
+            raise Exception('No Z stage has been defined.')
 
-    # def retract_Z(self, verbose = False):
-    #     self.Z_stage.retract(verbose=verbose)
+    def get_XY_position(self):
+        pos = np.array([None, None])
+        if self.XY_stage:
+            pos[0] = self.XY_stage.get_position()[0]
+            # TODO -> fix this I think is pos[0:2]
+            pos[1] = self.XY_stage.get_position()[1]
+            return pos
+        else:
+            raise Exception('No XY stage has been defined.')
 
+    def camera_live(self, root=None):
+        self.camera.live_image(root)
 
-    # def set_retract_Z(self, retract_pos=None, relative=False, unit=None, verbose = False):
-    #     if unit is None:    
-    #         unit = self.units[2]
-    #     if retract_pos is None:
-    #         retract_pos = self.get_Z_position()
-    #     self.Z_stage.set_retract(retract_pos=retract_pos, relative=relative, unit=unit, verbose = verbose)
+    def get_image(self, color=True):
+        return self.camera.get_image(color=color)
 
-    # def get_Z_position(self):
-    #     if self.Z_stage:
-    #         return self.Z_stage.get_position()
-    #     else:
-    #         raise Exception('No Z stage has been defined.')
+    def save_image(self, name, format='png', folder_path='', w_metadata=True):
+        if w_metadata:
+            return self.camera.save_image(
+                name=name, format=format, path=folder_path,
+                metadata_dict=self.get_image_metadata()
+            )
+        else:
+            return self.camera.save_image(
+                name=name, format=format, path=folder_path
+            )
 
-    # def get_XY_position(self):
-    #     pos = np.array([None, None])
-    #     if self.XY_stage:
-    #         pos[0] = self.XY_stage.get_position()[0]
-    #         pos[1] = self.XY_stage.get_position()[1]  # TODO -> fix this I think is pos[0:2]
-    #         return pos
-    #     else:
-    #         raise Exception('No XY stage has been defined.')
+    def read_image(self, image_path):
+        return self.camera.read_image(image_path)
 
-    # def camera_live(self, root = None):
-    #     self.camera.live_image(root)
-
-    # def get_image(self, color=True):
-    #     return self.camera.get_image(color=color)
-
-    # def save_image(self, name, format = 'png', folder_path = '', w_metadata = True):
-    #     if w_metadata:
-    #         return self.camera.save_image(name=name, format=format, path=folder_path, metadata_dict = self.get_image_metadata())
-    #     else:
-    #         return self.camera.save_image(name=name, format=format, path=folder_path)
-
-    # def read_image(self, image_path):
-    #     return self.camera.read_image(image_path)
-
-    # def show_spectrum(self):
-    #     # TODO -> Improve graphics
-    #     self.get_spectrum_df().plot(x='Raman Shift [cm-1]', y='Intensity', kind='line')
-    #     plt.show()
+    def show_spectrum(self):
+        # TODO -> Improve graphics
+        self.get_spectrum_df().plot(
+            x='Raman Shift [cm-1]', y='Intensity', kind='line'
+        )
+        plt.show()
 
 
 if __name__ == '__main__':
     # Test the BRamanController class
     print('Testing BRamanController class...')
     brc = BRamanController(simulated=True)
-    brc.print_info()
-    brc.close(verbose=True)
+    # brc.print_info()
+    # brc.move_XY(['1', '2'])
+    # brc.close(verbose=True)

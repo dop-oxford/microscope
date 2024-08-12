@@ -1,51 +1,136 @@
-"""MCM3000Controller."""
+"""MCM3000 controller class."""
 import time
 import serial
 import warnings
 
-supported_stages = {
-    # 'Type': (+-stage_limit_um, stage_conversion_um)
-    # from MCM300_Direct_Serial_Communication.pdf
-    # The stage limit is set such that the allowed positions will be between
-    # +stage_limit_um and -stage_limit_um
-    'ZFM2020': {
-        'limits': [-1e3 * 12.7, 1e3 * 12.7],
-        'conversion': 0.2116667
-    },
-    # 'ZFM2030':(1e3 * 12.7, 0.2116667),
-}
-
 
 class MCM3000Controller:
+    """
+    Controller for the Thorlabs MCM3000 motor controller.
+
+    This class provides interfaces to control motor stages, including
+    the initialisation of the motor stages, moving them to specific
+    encoder values or positions, setting encoder values to zero, and more.
+    The controller supports operations such as reversing the motion
+    direction, setting verbose output levels, and managing minimum
+    motion constraints.
+
+    Attributes
+    ----------
+    name : str
+        Name of the controller.
+    supported_stages : dict
+        A dictionary mapping stage names to their specifications.
+    verbose : bool
+        If True, prints basic operation info to the terminal.
+    very_verbose : bool
+        If True, prints extended operation info to the terminal.
+    simulated : bool
+        If this is a simulated controller (in silico as opposed to connected to
+        hardware).
+    stages : tuple
+        Names of the stage types for each channel.
+    channels : tuple
+        Labels of each control channel.
+    reverse : tuple
+        Indicates if the motion direction for each axis is reversed.
+    reverse_factors : list
+        Factors to apply to reverse motion direction, derived from `reverse`.
+    _internal_channels : tuple
+        Internal mapping of channels, used for indexing.
+    _internal_channels_dict : dict
+        Maps external channel labels to internal channel indices.
+    _stage_upper_limit_um : list
+        Upper motion limit for each stage, in micrometers.
+    _stage_lower_limit_um : list
+        Lower motion limit for each stage, in micrometers.
+    _stage_lowest_scan_point_um : list
+        Safe lower bound for scanning, to avoid damaging the sample.
+    _stage_highest_scan_point_um : list
+        Safe upper bound for scanning.
+    _stage_retract_point_um : list
+        Retract points before engaging in X-Y motion.
+    _min_encoder_motion : int
+        Minimum number of encoder counts required for motion to be recognized.
+    _stage_conversion_um : list
+        Conversion factors from encoder counts to micrometers for each stage.
+    _current_encoder_value : list
+        Current encoder values for each channel.
+    _pending_encoder_value : list
+        Target encoder values during motion, becomes None when motion finishes.
+
+    Raises
+    ------
+    IOError
+        If no connection can be established on the provided port.
+    AssertionError
+        For various conditions such as incorrect types or values for `stages`,
+        `reverse`, and `channels`.
+    """
 
     def __init__(
-        self,
-        # This is 'COMX' if using USB connection
-        port,
-        # Name on controller
-        name='MCM3000',
-        # Defines the name of the type of stages (i.e. 'ZFM2020')
-        stages=3*(None,),
-        # States if the axis are reversed (i.e. down is positive)
-        reverse=3*(False,),
-        # Label of each channel
-        # WATCH OUT BECAUSE IN PRACTICE THEY ARE LABELLED 1, 2, 3
-        channels=(1, 2, 3),
-        # If True, info in printed in terminal
-        verbose=True,
-        # If True, more info in printed in terminal
-        very_verbose=False,
-        # If this is a simulated controller
-        simulated=False
+        self, port, name='MCM3000', stages=(None, None, None),
+        reverse=(False, False, False), channels=(1, 2, 3), verbose=True,
+        very_verbose=False, simulated=False
     ):
+        """
+        Initialise an MCM3000 controller object.
+
+        Parameters
+        ----------
+        port : str
+            Identifier for the communication port. This port name will be of
+            the form 'COMX' if a USB connection is used.
+        name : str, default 'MCM3000'
+            Name of the controller.
+        stages : tuple of str or NoneType, default (None, None, None)
+            Names of the stage types for each channel (eg 'ZFM2020').
+        reverse : tuple of bool, default (False, False, False)
+            Indicates if the motion direction for each axis is reversed (down
+            is positive).
+        channels : tuple of int, default (1, 2, 3)
+            Labels of each control channel (in practice they are labelled 1, 2,
+            3).
+        verbose : bool, default True
+            If True, prints basic operation info to the terminal.
+        very_verbose : bool, default False
+            If True, prints extended operation info to the terminal.
+        simulated : bool, default False
+            If this is a simulated controller (ie if you are not connected to
+            actual hardware).
+        """
+        # Check inputs
+        assert (type(stages) is tuple) and (type(reverse) is tuple) and \
+            (type(channels) is tuple), (
+                f'{self.name}: stages, reverse and channels must be a tuple, '
+                f'currently {type(stages)}, {type(reverse)}, {type(channels)}'
+            )
+        assert (len(stages) == 3) and (len(reverse) == 3) and \
+            (len(channels) == 3), (
+                f'{self.name}: stages, reverse and channels must be a tuple '
+                f'of 3 elements, currently {len(stages)}, {len(reverse)}, '
+                f'{len(channels)}'
+        )
+        for element in reverse:
+            assert (type(element) is bool), (
+                f'{self.name}: reverse must be a tuple of Booleans'
+            )
+
+        # Assign inputs to attributes
         self.name = name
-        self.supported_stages = supported_stages
+        self.stages = stages
+        self.reverse = reverse
+        self.channels = channels
         self.verbose = verbose
         self.very_verbose = very_verbose
+        self.simulated = simulated
+
+        # Connect to port
         if self.verbose:
             print(f'{self.name}: opening...', end='')
-        if simulated:
-            self.port = 'The port is simulated'
+        if self.simulated:
+            print('the port will be simulated...', end='')
+            self.port = None
         else:
             try:
                 self.port = serial.Serial(port=port, baudrate=460800)
@@ -56,101 +141,114 @@ class MCM3000Controller:
         if self.verbose:
             print('done.')
 
-        error_message = (
-                f'{self.name}: stages, reverse and channels must be a tuple, '
-                f'currently {type(stages)}, {type(reverse)}, {type(channels)}'
-        )
-        assert type(stages) is tuple and type(reverse) is tuple and \
-               type(channels) is tuple, error_message
-        error_message = (
-                f'{self.name}: stages, reverse and channels must be a tuple '
-                f'of 3 elements, currently {len(stages)}, {len(reverse)}, '
-                f'{len(channels)}'
-        )
-        assert len(stages) == 3 and len(reverse) == 3 and len(channels) == 3, \
-               error_message
-
-        for element in reverse:
-            msg = f'{self.name}: reverse must be a tuple of booleans'
-            assert type(element) is bool, msg
+        # Define supported stages
+        supported_stages = {
+            # The MCM3001 controller has an encoder resolution of 0.212 μm
+            # which I assume is more precisely 0.2116667 μm (the MCM3002
+            # controller has a resolution of 0.5 μm). This is needed to convert
+            # from encoder counts to micrometers. See page 24 of the
+            # documentation here:
+            # https://www.thorlabs.com/thorProduct.cfm?partnumber=MCM3000
+            #
+            # The ZFM2020 module has a travel range of 1 inch (25.4 mm) hence
+            # its limits are from -12.7 mm to +12.7 mm. See page 11 of the
+            # documentation here:
+            # https://www.thorlabs.com/catalogpages/Obsolete/2024/ZFM2020.pdf
+            'ZFM2020': {
+                'limits': [-1e3 * 12.7, 1e3 * 12.7],
+                'conversion': 0.2116667
+            },
+            # The ZFM2030 module has a travel range of 1 inch (25.4 mm) hence
+            # its limits are from -12.7 mm to +12.7 mm. See page 11 of the
+            # documentation here:
+            # https://www.thorlabs.com/catalogpages/Obsolete/2024/ZFM2030.pdf
+            'ZFM2030': {
+                'limits': [-1e3 * 12.7, 1e3 * 12.7],
+                'conversion': 0.2116667
+            }
+        }
+        self.supported_stages = supported_stages
+        # Check
         for element in stages:
             if element is not None:
-                msg = (
+                assert (element in self.supported_stages), (
                     f'{self.name}: stage \'{element}\' not tested for ',
                     f'{self.name} controller!!'
                 )
-                assert element in self.supported_stages, msg
-        self.stages = stages
-        self.channels = channels
+
+        # Derive factors to apply to reverse motor direction
+        self.reverse_factors = len(reverse) * [1,]
+        for ii in range(len(reverse)):
+            if self.reverse[ii]:
+                self.reverse_factors[ii] = -1
+
         # This is for internal use
         self._internal_channels = (0, 1, 2)
         # This is for internal use
         self._internal_channels_dict = dict(
             zip(self.channels, self._internal_channels)
         )
-        self.reverse = reverse
-        self.reverse_factors = len(reverse)*[1,]
-        for ii in range(len(reverse)):
-            if self.reverse[ii]:
-                self.reverse_factors[ii] = -1
         # The lowest and highest range of the stage
-        self._stage_upper_limit_um = 3*[None]
-        self._stage_lower_limit_um = 3*[None]
-        # The lowest and highest scan points (i.e. the lowest point before
+        self._stage_upper_limit_um = 3 * [None]
+        self._stage_lower_limit_um = 3 * [None]
+        # The lowest and highest scan points (ie the lowest point before
         # damaging the sample being scanned)
-        self._stage_lowest_scan_point_um = 3*[None]
-        self._stage_highest_scan_point_um = 3*[None]
+        self._stage_lowest_scan_point_um = 3 * [None]
+        self._stage_highest_scan_point_um = 3 * [None]
         # The level at which to retract before engaging in X-Y motion
-        self._stage_retract_point_um = 3*[None]
+        self._stage_retract_point_um = 3 * [None]
         # The minimum number of counts that it can move (for very small motions
         # it struggles)
         self._min_encoder_motion = 5
         # Conversion factor: um/count
-        self._stage_conversion_um = 3*[None]
-        self._current_encoder_value = 3*[None]
+        self._stage_conversion_um = 3 * [None]
+        self._current_encoder_value = 3 * [None]
         # Is None when all motions have finished but, while in motion, it is
         # the target encoder value (until it is reached and becomes None)
-        self._pending_encoder_value = 3*[None]
+        self._pending_encoder_value = 3 * [None]
 
+        # Set the stage limits and conversion factors
         for channel, stage in enumerate(stages):
             if stage is not None:
                 assert stage in self.supported_stages, (
                     f'{self.name}: stage \'{stage}\' not supported'
                 )
+
                 # Set lower and upper limit (these are the max and min points
                 # that the stage can physically do)
                 # Check that the limits are correctly set
-                if self.supported_stages[stage]["limits"][0] == \
-                   self.supported_stages[stage]["limits"][1]:
-                    self.supported_stages[stage]["limits"][1] = abs(
-                        self.supported_stages[stage]["limits"][0]
+                if self.supported_stages[stage]['limits'][0] == \
+                   self.supported_stages[stage]['limits'][1]:
+                    self.supported_stages[stage]['limits'][1] = abs(
+                        self.supported_stages[stage]['limits'][0]
                     )
-                    self.supported_stages[stage]["limits"][0] = -abs(
-                        self.supported_stages[stage]["limits"][1]
+                    self.supported_stages[stage]['limits'][0] = -abs(
+                        self.supported_stages[stage]['limits'][1]
                     )
                     warnings.warn(
                         f'{self.name}: stage \'{stage}\' has the same upper '
                         'and lower limits, assuming symmetric range'
                     )
-                elif self.supported_stages[stage]["limits"][0] > \
-                        self.supported_stages[stage]["limits"][1]:
-                    buffer = self.supported_stages[stage]["limits"][0]
-                    self.supported_stages[stage]["limits"][0] = \
-                        self.supported_stages[stage]["limits"][1]
-                    self.supported_stages[stage]["limits"][1] = buffer
+                elif self.supported_stages[stage]['limits'][0] > \
+                        self.supported_stages[stage]['limits'][1]:
+                    buffer = self.supported_stages[stage]['limits'][0]
+                    self.supported_stages[stage]['limits'][0] = \
+                        self.supported_stages[stage]['limits'][1]
+                    self.supported_stages[stage]['limits'][1] = buffer
                     warnings.warn(
                         f'{self.name}: stage \'{stage}\' has the upper limit '
                         'smaller than the lower limit, swapping them'
                     )
                 self._stage_upper_limit_um[channel] = \
-                    self.supported_stages[stage]["limits"][1]
+                    self.supported_stages[stage]['limits'][1]
                 self._stage_lower_limit_um[channel] = \
-                    self.supported_stages[stage]["limits"][0]
+                    self.supported_stages[stage]['limits'][0]
+
                 # Set conversion factor
                 self._stage_conversion_um[channel] = abs(
-                    self.supported_stages[stage]["conversion"]
+                    self.supported_stages[stage]['conversion']
                 )  # Just ensure that it is positive
-                # Set scan points and retract points (for initializing they
+                # Set scan points and retract points (for initialising they
                 # are just the same as max points)
                 self._stage_highest_scan_point_um[channel] = \
                     self._stage_upper_limit_um[channel]
@@ -172,48 +270,41 @@ class MCM3000Controller:
                         )
 
         if self.verbose:
-            print(f'\n{self.name}: stages:', self.stages)
-            print(f'\n{self.name}: channels:', self.channels)
-            print(f'\n{self.name}: reverse:', self.reverse)
-            print(f'\n{self.name}: reverse factors', self.reverse_factors)
+            print(f'{self.name}: stages:', self.stages)
+            print(f'{self.name}: channels:', self.channels)
+            print(f'{self.name}: reverse:', self.reverse)
+            print(f'{self.name}: reverse factors', self.reverse_factors)
             print(
-                f'\n{self.name}: stage_upper_limit_um:',
+                f'{self.name}: stage_upper_limit_um:',
                 self._stage_upper_limit_um
             )
             print(
-                f'\n{self.name}: stage_highest_scan_point_um:',
+                f'{self.name}: stage_highest_scan_point_um:',
                 self._stage_highest_scan_point_um
             )
             print(
-                f'\n{self.name}: stage_lower_limit_um:',
+                f'{self.name}: stage_lower_limit_um:',
                 self._stage_lower_limit_um
             )
             print(
-                f'\n{self.name}: stage_lowest_scan_point_um:',
+                f'{self.name}: stage_lowest_scan_point_um:',
                 self._stage_lowest_scan_point_um
             )
             print(
-                f'\n{self.name}: stage_conversion_um:',
+                f'{self.name}: stage_conversion_um:',
                 self._stage_conversion_um
             )
             print(
-                f'\n{self.name}: stage_retract_point_um:',
+                f'{self.name}: stage_retract_point_um:',
                 self._stage_retract_point_um
             )
             print(
-                f'\n{self.name}: current_encoder_value:',
+                f'{self.name}: current_encoder_value:',
                 self._current_encoder_value
             )
 
-        if simulated:
-            self.simulated = True
-        else:
-            self.simulated = False
-
     def print_info(self):
-        """
-        Prints the information about the controller and the stages.
-        """
+        """Print the information about the controller and the stages."""
         print('\n---------------------')
         print('---------------------')
         print(f'Controller {self.name} info:')
@@ -254,10 +345,12 @@ class MCM3000Controller:
 
     def print_channel_info(self, channel):
         """
-        Prints the information about the specified channel.
+        Print the information about the specified channel.
 
-        Args:
-            channel (int): The channel to print the information for.
+        Parameters
+        ----------
+        channel : int
+            The channel for which to print the information.
         """
         self.validate_channel(channel)
         print('\n---------------------')
@@ -308,15 +401,19 @@ class MCM3000Controller:
 
     def validate_channel(self, channel, internal=False):
         """
-        Validates if the specified channel is available.
+        Validate if the specified channel is available.
 
-        Args:
-            channel (str): The channel to validate.
-            internal (bool, optional): If True, the channel is validated
-                against internal channels. Defaults to False.
+        Parameters
+        ----------
+        channel : str
+            The channel to validate.
+        internal :bool, default False
+            If True, the channel is validated against internal channels.
 
-        Raises:
-            AssertionError: If the specified channel is not available.
+        Raises
+        ------
+        AssertionError
+            If the specified channel is not available.
         """
         if not internal:
             assert channel in self.channels, (
@@ -329,16 +426,21 @@ class MCM3000Controller:
 
     def get_stages(self, channel=None, internal=False):
         """
-        Retrieves the stage names for a given channel or all channels.
+        Retrieve the stage names for a given channel or all channels.
 
-        Args:
-            channel (int or None, optional): The channel to retrieve the stage
-                name for. If None, returns names for all channels.
-            internal (bool, optional): If True, treats `channel` as an internal
-                index. Otherwise, `channel` is treated as an external label.
+        Parameters
+        ----------
+        channel : int or None, default None
+            The channel to retrieve the stage name for. If None, returns names
+            for all channels.
+        internal : bool, default False
+            If True, treats `channel` as an internal index. Otherwise,
+            `channel` is treated as an external label.
 
-        Returns:
-            tuple or str: The stage name(s) for the requested channel(s).
+        Returns
+        -------
+        tuple or str
+            The stage name(s) for the requested channel(s).
         """
         if channel is None:
             return self.stages
@@ -350,10 +452,12 @@ class MCM3000Controller:
 
     def get_channels(self):
         """
-        Retrieves the labels of each control channel.
+        Retrieve the labels of each control channel.
 
-        Returns:
-            tuple: The labels of the control channels.
+        Returns
+        -------
+        tuple
+            The labels of the control channels.
         """
         return self.channels
 
@@ -361,16 +465,20 @@ class MCM3000Controller:
         """
         Retrieve the reverse motion direction indicator.
 
-        Args:
-            channel (int or None, optional): The channel to retrieve the
-                reverse indicator for. If None, returns indicators for all
-                channels.
-            internal (bool, optional): If True, treats `channel` as an internal
-                index. Otherwise, `channel` is treated as an external label.
+        Parameters
+        ----------
+        channel : int or None, default None
+            The channel to retrieve the reverse indicator for. If None,
+            returns indicators for all channels.
+        internal : bool, default False
+            If True, treats `channel` as an internal index. Otherwise,
+            `channel` is treated as an external label.
 
-        Returns:
-            tuple or bool: The reverse motion direction indicator(s) for the
-                requested channel(s).
+        Returns
+        -------
+        tuple or bool
+            The reverse motion direction indicator(s) for the requested
+            channel(s).
         """
         if channel is None:
             return self.reverse
@@ -382,16 +490,21 @@ class MCM3000Controller:
 
     def get_reverse_factors(self, channel=None, internal=False):
         """
-        Retrieves the reverse factors for a given channel or all channels.
+        Retrieve the reverse factors for a given channel or all channels.
 
-        Args:
-            channel (int or None, optional): The channel to retrieve the
-                reverse factor for. If None, returns factors for all channels.
-            internal (bool, optional): If True, treats `channel` as an internal
-                index. Otherwise, `channel` is treated as an external label.
+        Parameters
+        ----------
+        channel : int or None, default None
+            The channel to retrieve the reverse factor for. If None,
+            returns factors for all channels.
+        internal : bool, default False
+            If True, treats `channel` as an internal index. Otherwise,
+            `channel` is treated as an external label.
 
-        Returns:
-            list or int: The reverse factor(s) for the requested channel(s).
+        Returns
+        -------
+        list or int
+            The reverse factor(s) for the requested channel(s).
         """
         if channel is None:
             return self.reverse_factors
@@ -405,15 +518,19 @@ class MCM3000Controller:
         """
         Retrieve current encoder values for a given channel or all channels.
 
-        Args:
-            channel (int or None, optional): The channel to retrieve the
-                encoder value for. If None, returns values for all channels.
-            internal (bool, optional): If True, treats `channel` as an internal
-                index. Otherwise, `channel` is treated as an external label.
+        Parameters
+        ----------
+        channel : int or None, default None
+            The channel to retrieve the encoder value for. If None, returns
+            values for all channels.
+        internal : bool, default False
+            If True, treats `channel` as an internal index. Otherwise,
+            `channel` is treated as an external label.
 
-        Returns:
-            list or int: The current encoder value(s) for the requested
-                channel(s).
+        Returns
+        -------
+        list or int
+            The current encoder value(s) for the requested channel(s).
         """
         if channel is None:
             return self._current_encoder_value
@@ -425,17 +542,22 @@ class MCM3000Controller:
 
     def get_stage_upper_limit_um(self, channel=None, internal=False):
         """
-        Retrieves the upper motion limit for a given channel or all channels.
+        Retrieve the upper motion limit for a given channel or all channels.
 
-        Args:
-            channel (int or None, optional): The channel to retrieve the upper
-                motion limit for. If None, returns limits for all channels.
-            internal (bool, optional): If True, treats `channel` as an internal
-                index. Otherwise, `channel` is treated as an external label.
+        Parameters
+        ----------
+        channel : int or None, default None
+            The channel to retrieve the upper motion limit for. If None,
+            returns limits for all channels.
+        internal : bool, default False
+            If True, treats `channel` as an internal index. Otherwise,
+            `channel` is treated as an external label.
 
-        Returns:
-            list or int: The upper motion limit(s) in micrometers for the
-                requested channel(s).
+        Returns
+        -------
+        list or int
+            The upper motion limit(s) in micrometers for the requested
+            channel(s).
         """
         if channel is None:
             return self._stage_upper_limit_um
@@ -447,17 +569,22 @@ class MCM3000Controller:
 
     def get_stage_lower_limit_um(self, channel=None, internal=False):
         """
-        Retrieves the lower motion limit for a given channel or all channels.
+        Retrieve the lower motion limit for a given channel or all channels.
 
-        Args:
-            channel (int or None, optional): The channel to retrieve the lower
-                motion limit for. If None, returns limits for all channels.
-            internal (bool, optional): If True, treats `channel` as an internal
-                index. Otherwise, `channel` is treated as an external label.
+        Parameters
+        ----------
+        channel : int or None, default None
+            The channel to retrieve the lower motion limit for. If None,
+            returns limits for all channels.
+        internal : bool, default False
+            If True, treats `channel` as an internal index. Otherwise,
+            `channel` is treated as an external label.
 
-        Returns:
-            list or int: The lower motion limit(s) in micrometers for the
-                requested channel(s).
+        Returns
+        -------
+        list or int
+            The lower motion limit(s) in micrometers for the requested
+            channel(s).
         """
         if channel is None:
             return self._stage_lower_limit_um
@@ -471,16 +598,20 @@ class MCM3000Controller:
         """
         Retrieve the safe lower bound for scanning to avoid damaging a sample.
 
-        Args:
-            channel (int or None, optional): The channel to retrieve the safe
-                lower scan point for. If None, returns scan points for all
-                channels.
-            internal (bool, optional): If True, treats `channel` as an internal
-                index. Otherwise, `channel` is treated as an external label.
+        Parameters
+        ----------
+        channel : int or None, default None
+            The channel to retrieve the safe lower scan point for. If None,
+            returns scan points for all channels.
+        internal : bool, default False
+            If True, treats `channel` as an internal index. Otherwise,
+            `channel` is treated as an external label.
 
-        Returns:
-            list or int: The safe lower scan point(s) in micrometers for the
-                requested channel(s).
+        Returns
+        -------
+        list or int
+            The safe lower scan point(s) in micrometers for the requested
+            channel(s).
         """
         if channel is None:
             return self._stage_lowest_scan_point_um
@@ -494,16 +625,20 @@ class MCM3000Controller:
         """
         Retrieve the safe upper bound for scanning.
 
-        Args:
-            channel (int or None, optional): The channel to retrieve the safe
-                upper scan point for. If None, returns scan points for all
-                channels.
-            internal (bool, optional): If True, treats `channel` as an internal
-                index. Otherwise, `channel` is treated as an external label.
+        Parameters
+        ----------
+        channel : int or None, default None
+            The channel to retrieve the safe upper scan point for. If None,
+            returns scan points for all channels.
+        internal : bool, default False
+            If True, treats `channel` as an internal index. Otherwise,
+            `channel` is treated as an external label.
 
-        Returns:
-            list or int: The safe upper scan point(s) in micrometers for the
-                requested channel(s).
+        Returns
+        -------
+        list or int
+            The safe upper scan point(s) in micrometers for the requested
+            channel(s).
         """
         if channel is None:
             return self._stage_highest_scan_point_um
@@ -517,16 +652,20 @@ class MCM3000Controller:
         """
         Retrieve the retract points before engaging in X-Y motion.
 
-        Args:
-            channel (int or None, optional): The channel to retrieve the
-                retract point for. If None, returns retract points for all
-                channels.
-            internal (bool, optional): If True, treats `channel` as an internal
-                index. Otherwise, `channel` is treated as an external label.
+        Parameters
+        ----------
+        channel : int or None, default None
+            The channel to retrieve the retract point for. If None,
+            returns retract points for all channels.
+        internal : bool, default False
+            If True, treats `channel` as an internal index. Otherwise,
+            `channel` is treated as an external label.
 
-        Returns:
-            list or int: The retract point(s) in micrometers for the requested
-                channel(s).
+        Returns
+        -------
+        list or int
+            The retract point(s) in micrometers for the requested
+            channel(s).
         """
         if channel is None:
             return self._stage_retract_point_um
@@ -538,28 +677,36 @@ class MCM3000Controller:
 
     def get_min_encoder_motion(self):
         """
-        Retrieve the minimum number of encoder counts required for motion to be
-        recognised.
+        Retrieve the minimum encoder counts that will be recognised as motion.
 
-        Returns:
-            int: The minimum number of encoder counts.
+        Returns
+        -------
+        int
+            The minimum number of encoder counts required for motion to be
+            recognised.
         """
         return self._min_encoder_motion
 
     def get_stage_conversion_um(self, channel=None, internal=False):
         """
-        Retrieves the conversion factors from encoder counts to micrometers for
-        each stage, for a given channel or all channels.
+        Retrieve the conversion factors.
 
-        Args:
-            channel (int or None, optional): The channel to retrieve the
-                conversion factor for. If None, returns conversion factors for
-                all channels.
-            internal (bool, optional): If True, treats `channel` as an internal
-                index. Otherwise, `channel` is treated as an external label.
+        These factors are needed to convert from encoder counts to micrometers
+        for each stage, for a given channel or for all channels.
 
-        Returns:
-            list or int: The conversion factor(s) for the requested channel(s).
+        Parameters
+        ----------
+        channel : int or None, default None
+            The channel to retrieve the conversion factor for. If None,
+            returns conversion factors for all channels.
+        internal : bool, default False
+            If True, treats `channel` as an internal index. Otherwise,
+            `channel` is treated as an external label.
+
+        Returns
+        -------
+        list or int
+            The conversion factor(s) for the requested channel(s).
         """
         if channel is None:
             return self._stage_conversion_um
@@ -571,19 +718,25 @@ class MCM3000Controller:
 
     def get_pending_encoder_value(self, channel=None, internal=False):
         """
-        Retrieve the target encoder values during motion, which becomes None
-        when motion finishes, for a given channel or all channels.
+        Retrieve the target encoder values during motion.
 
-        Args:
-            channel (int or None, optional): The channel to retrieve the target
-                encoder value for. If None, returns target values for all
-                channels.
-            internal (bool, optional): If True, treats `channel` as an internal
-                index. Otherwise, `channel` is treated as an external label.
+        This becomes None when motion finishes. It can be retrieved for a given
+        channel or all channels.
 
-        Returns:
-            list or int or None: The target encoder value(s) for the requested
-                channel(s), or None if motion has finished.
+        Parameters
+        ----------
+        channel : int or None, default None
+            The channel to retrieve the target encoder value for. If None,
+            returns target values for all channels.
+        internal : bool, default False
+            If True, treats `channel` as an internal index. Otherwise,
+            `channel` is treated as an external label.
+
+        Returns
+        -------
+        list or int or None
+            The target encoder value(s) for the requested channel(s), or None
+            if motion has finished.
         """
         if channel is None:
             return self._pending_encoder_value
@@ -1326,7 +1479,7 @@ class MCM3000Controller:
 
     def close(self, verbose=False, simulated=False):
         """
-        Closes the connection to the MCM3000 controller.
+        Close the connection to the MCM3000 controller.
 
         This method closes the connection to the MCM3000 controller by closing
         the port.
@@ -1336,22 +1489,22 @@ class MCM3000Controller:
         if not simulated and not self.simulated:
             self.port.close()
         if verbose:
-            print(f"{self.name} CLOSED.")
+            print(f'{self.name} CLOSED.')
         return None
 
 
 if __name__ == '__main__':
-    # Remember starts at 1
+    # Remember, channels start at 1
     chnl = 1
     stage_controller = MCM3000Controller(
         'COM3',
+        simulated=True,
         stages=('ZFM2020', None, None),
-        reverse=(True, False, False),
-        simulated=True
+        reverse=(True, False, False)
     )
 
-    stage_controller.print_info()
-    stage_controller.print_channel_info(chnl)
+    # stage_controller.print_info()
+    # stage_controller.print_channel_info(chnl)
 
     # # Read position
     # print('\n# Get position:')

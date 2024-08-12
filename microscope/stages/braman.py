@@ -1,4 +1,4 @@
-"""BRamanZStage Abstract Base Class."""
+"""B Raman stages."""
 from abc import ABC, abstractmethod
 
 # Dictionary to map units to their conversion factor to micrometers
@@ -10,6 +10,152 @@ unit_conversion_um = {
     'nm': 1e-3,
     'pm': 1e-6
 }
+
+
+class BRamanXYStage(ABC):
+
+    def __init__(self, stage_name="XY Stage"):
+        self.stage_name = stage_name
+
+    @abstractmethod
+    def initialize(self, max_vel, acc, force_home, verbose):
+        """Initialize the XY stage with given parameters.
+
+        Args:
+            max_vel (float): Maximum velocity for the stage movement.
+            acc (float): Acceleration for the stage movement.
+            force_home (bool): If True, forces the stage to home even if it's
+                already homed.
+            verbose (bool): If True, enables verbose output during operation.
+
+        """
+        pass
+
+    @abstractmethod
+    def set_velocity_params(self, channel, max_vel, acc, verbose):
+        """Set velocity parameters for the specified channels.
+
+        Args:
+            channel (list or None, optional): List of channel names or numbers.
+                If None, sets parameters for all channels. Defaults to None.
+            max_vel (float or None, optional): Maximum velocity. Defaults to
+                None.
+            acc (float or None, optional): Acceleration. Defaults to None.
+            verbose (bool, optional): Whether to print additional information.
+                Defaults to False.
+        """
+        pass
+
+    @abstractmethod
+    def move_mm(
+        self, target_pos, channel, relative, max_vel, acc, permanent, verbose
+    ):
+        """Move the XY stage to a specified end position.
+
+        Args:
+            target_pos (list/tuple): A tuple specifying the target X and Y
+                positions.
+            channel (list/tuple or None, optional): List of channel names or
+                numbers. If None, moves all channels. Defaults to None.
+            max_vel (float or None, optional): Maximum velocity for all
+                channels. Defaults to None.
+            acc (float or None, optional): Acceleration for all channels.
+                Defaults to None.
+            permanent (bool, optional): Whether to make velocity and
+                acceleration changes permanent. Defaults to False.
+            verbose (bool, optional): Whether to print additional information.
+                Defaults to False.
+
+        """
+        pass
+
+    @abstractmethod
+    def home(self, force_home=False, verbose=False):
+        """Homes the XY stage.
+
+        Args:
+            force_home (bool): If True, forces the stage to home regardless if
+                it is homed already or not.
+            verbose (bool): If True, enables verbose output during the homing
+                operation.
+        """
+        pass
+
+    @abstractmethod
+    def get_position(self):
+        """Get the current position of the XY stage.
+
+        Returns:
+            tuple: The current X and Y position of the stage.
+
+        """
+        pass
+
+    @abstractmethod
+    def close(self, force, verbose):
+        """Clean up and releases resources of the XY stage.
+
+        Args:
+            force (bool): If True, forces the stage to close regardless of its
+                current state.
+            verbose (bool): If True, enables verbose output during cleanup.
+
+        """
+        pass
+
+    def move(self, target_pos, relative, units='mm', verbose=False):
+        """Move the XY stage to a specified end position.
+
+        Args:
+            target_pos (tuple): A tuple specifying the target X and Y
+                positions.
+            relative (bool): If True, the target position is relative to the
+                current position.
+            unit (str): The unit of the target position. Supported units are
+                'mm', 'cm', 'm', 'um', 'nm', 'pm'.
+            verbose (bool): If True, enables verbose output during the move
+                operation.
+
+        """
+        target_mm_pos = self.convert_to_mm(target_pos, units)
+        self.move_mm(target_mm_pos, relative, verbose)
+
+    @staticmethod
+    def convert_to_mm(value, unit):
+        """
+        Convert a given value from specified units to milimeters (mm).
+
+        Args:
+            value (float): The value to convert.
+            unit (str): The unit of the given value. Supported units are 'um',
+                'mm', 'cm', 'm', 'nm', 'pm'.
+
+        Returns:
+            float: The value converted to milimiters (mm).
+
+        Raises:
+            ValueError: If the specified unit is not supported.
+        """
+        # Dictionary to map units to their conversion factor to micrometers
+        unit_conversion = {
+            'um': 1e-3,
+            'mm': 1,
+            'cm': 10,
+            'm': 1e3,
+            'nm': 1e-6,
+            'pm': 1e-9
+        }
+
+        if unit not in unit_conversion:
+            raise ValueError(
+                f"Unsupported unit: {unit}. Supported units are 'um', 'mm', "
+                "'cm', 'm', 'nm', 'pm'."
+            )
+
+        # Perform conversion
+        converted_value = value * unit_conversion[unit]
+
+        return converted_value
 
 
 class BRamanZStage(ABC):
