@@ -1,4 +1,5 @@
 """MCM3000Controller."""
+
 import time
 import serial
 import warnings
@@ -11,15 +12,13 @@ supported_stages = {
     # from MCM300_Direct_Serial_Communication.pdf
     # The stage limit is set such that the allowed positions will be between
     # +stage_limit_um and -stage_limit_um
-    'ZFM2020': {
-        'limits': [-1e3 * 12.7, 1e3 * 12.7],
-        'conversion': 0.2116667
-    },
+    "ZFM2020": {"limits": [-1e3 * 12.7, 1e3 * 12.7], "conversion": 0.2116667},
     # 'ZFM2030':(1e3 * 12.7, 0.2116667),
 }
 
 # TODO: Big todo, the general approach needs to be that we call very high level methods on the controllers:
 # E.g. we call move_to: This then calls alvaro's existing lower level private methods e.g. _move_to_encoder_value
+
 
 class MCM3000Controller(microscope.abc.Controller):
     def __init__(
@@ -27,11 +26,11 @@ class MCM3000Controller(microscope.abc.Controller):
         # This is 'COMX' if using USB connection
         port,
         # Name on controller
-        name='MCM3000',
+        name="MCM3000",
         # Defines the name of the type of stages (i.e. 'ZFM2020')
-        stages=3*(None,),
+        stages=3 * (None,),
         # States if the axis are reversed (i.e. down is positive)
-        reverse=3*(False,),
+        reverse=3 * (False,),
         # Label of each channel
         # WATCH OUT BECAUSE IN PRACTICE THEY ARE LABELLED 1, 2, 3
         channels=(1, 2, 3),
@@ -40,7 +39,7 @@ class MCM3000Controller(microscope.abc.Controller):
         # If True, more info in printed in terminal
         very_verbose=False,
         # If this is a simulated controller
-        simulated=False
+        simulated=False,
     ):
         self.name = name
         self.supported_stages = supported_stages
@@ -48,25 +47,33 @@ class MCM3000Controller(microscope.abc.Controller):
         self.very_verbose = very_verbose
         self._devices = {}
         if self.verbose:
-            print(f'{self.name}: opening...', end='')
+            print(f"{self.name}: opening...", end="")
         if simulated:
-            self.port = 'The port is simulated'
+            self.port = "The port is simulated"
         else:
             try:
                 self.port = serial.Serial(port=port, baudrate=460800)
             except serial.serialutil.SerialException:
-                raise IOError(
-                    f'{self.name}: no connection on port {port}'
-                )
+                raise IOError(f"{self.name}: no connection on port {port}")
         if self.verbose:
-            print('done.')
-        assert type(stages) is tuple and type(reverse) is tuple and type(channels) is tuple, (f'{self.name}: stages, reverse and channels must be a tuple, currently {type(stages)}, {type(reverse)}, {type(channels)}')
-        assert len(stages) == 3 and len(reverse) == 3 and len(channels) == 3, (f'{self.name}: stages, reverse and channels must be a tuple of 3 elements, currently {len(stages)}, {len(reverse)}, {len(channels)}')
+            print("done.")
+        assert (
+            type(stages) is tuple
+            and type(reverse) is tuple
+            and type(channels) is tuple
+        ), f"{self.name}: stages, reverse and channels must be a tuple, currently {type(stages)}, {type(reverse)}, {type(channels)}"
+        assert (
+            len(stages) == 3 and len(reverse) == 3 and len(channels) == 3
+        ), f"{self.name}: stages, reverse and channels must be a tuple of 3 elements, currently {len(stages)}, {len(reverse)}, {len(channels)}"
         for element in reverse:
-            assert type(element) == bool, (f'{self.name}: reverse must be a tuple of booleans')
-        for element in stages: 
+            assert (
+                type(element) == bool
+            ), f"{self.name}: reverse must be a tuple of booleans"
+        for element in stages:
             if element is not None:
-                assert element in self.supported_stages, (f'{self.name}: stage \'{element}\' not tested for {self.name} controller!!')
+                assert (
+                    element in self.supported_stages
+                ), f"{self.name}: stage '{element}' not tested for {self.name} controller!!"
         self.stages = stages
         self.channels = channels
         # This is for internal use
@@ -76,63 +83,110 @@ class MCM3000Controller(microscope.abc.Controller):
             zip(self.channels, self._internal_channels)
         )
         self.reverse = reverse
-        self.reverse_factors = len(reverse)*[1,]
+        self.reverse_factors = len(reverse) * [
+            1,
+        ]
         for ii in range(len(reverse)):
             if self.reverse[ii]:
                 self.reverse_factors[ii] = -1
         # The lowest and highest range of the stage
-        self._stage_upper_limit_um = 3*[None]
-        self._stage_lower_limit_um = 3*[None]
+        self._stage_upper_limit_um = 3 * [None]
+        self._stage_lower_limit_um = 3 * [None]
         # The lowest and highest scan points (i.e. the lowest point before
         # damaging the sample being scanned)
-        self._stage_lowest_scan_point_um = 3*[None]
-        self._stage_highest_scan_point_um = 3*[None]
+        self._stage_lowest_scan_point_um = 3 * [None]
+        self._stage_highest_scan_point_um = 3 * [None]
         # The level at which to retract before engaging in X-Y motion
-        self._stage_retract_point_um = 3*[None]
+        self._stage_retract_point_um = 3 * [None]
         # The minimum number of counts that it can move (for very small motions
         # it struggles)
         self._min_encoder_motion = 5
         # Conversion factor: um/count
-        self._stage_conversion_um = 3*[None]
-        self._current_encoder_value = 3*[None]
+        self._stage_conversion_um = 3 * [None]
+        self._current_encoder_value = 3 * [None]
         # Is None when all motions have finished but, while in motion, it is
         # the target encoder value (until it is reached and becomes None)
-        self._pending_encoder_value = 3*[None]
+        self._pending_encoder_value = 3 * [None]
 
-        for channel, stage in zip(channels,stages):
+        for channel, stage in zip(channels, stages):
             if stage is not None:
-                assert stage in self.supported_stages, (f'{self.name}: stage \'{stage}\' not supported')
+                assert (
+                    stage in self.supported_stages
+                ), f"{self.name}: stage '{stage}' not supported"
                 # Set lower and upper limit (these are the max and min points
                 # that the stage can physically do)
                 # Check that the limits are correctly set
-                if self.supported_stages[stage]["limits"][0] == self.supported_stages[stage]["limits"][1]:
-                    self.supported_stages[stage]["limits"][1] = abs(self.supported_stages[stage]["limits"][0])
-                    self.supported_stages[stage]["limits"][0] = -abs(self.supported_stages[stage]["limits"][1])
-                    warnings.warn(f'{self.name}: stage \'{stage}\' has the same upper and lower limits, assuming symmetric range')
-                elif self.supported_stages[stage]["limits"][0] > self.supported_stages[stage]["limits"][1]:
+                if (
+                    self.supported_stages[stage]["limits"][0]
+                    == self.supported_stages[stage]["limits"][1]
+                ):
+                    self.supported_stages[stage]["limits"][1] = abs(
+                        self.supported_stages[stage]["limits"][0]
+                    )
+                    self.supported_stages[stage]["limits"][0] = -abs(
+                        self.supported_stages[stage]["limits"][1]
+                    )
+                    warnings.warn(
+                        f"{self.name}: stage '{stage}' has the same upper and lower limits, assuming symmetric range"
+                    )
+                elif (
+                    self.supported_stages[stage]["limits"][0]
+                    > self.supported_stages[stage]["limits"][1]
+                ):
                     buffer = self.supported_stages[stage]["limits"][0]
-                    self.supported_stages[stage]["limits"][0] = self.supported_stages[stage]["limits"][1]
+                    self.supported_stages[stage]["limits"][0] = (
+                        self.supported_stages[stage]["limits"][1]
+                    )
                     self.supported_stages[stage]["limits"][1] = buffer
-                    warnings.warn(f'{self.name}: stage \'{stage}\' has the upper limit smaller than the lower limit, swapping them')
-                self._stage_upper_limit_um[channel] = self.supported_stages[stage]["limits"][1]
-                self._stage_lower_limit_um[channel] = self.supported_stages[stage]["limits"][0]
+                    warnings.warn(
+                        f"{self.name}: stage '{stage}' has the upper limit smaller than the lower limit, swapping them"
+                    )
+                self._stage_upper_limit_um[channel] = self.supported_stages[
+                    stage
+                ]["limits"][1]
+                self._stage_lower_limit_um[channel] = self.supported_stages[
+                    stage
+                ]["limits"][0]
                 # Set conversion factor
-                self._stage_conversion_um[channel] = abs(self.supported_stages[stage]["conversion"]) # Just ensure that it is positive
+                self._stage_conversion_um[channel] = abs(
+                    self.supported_stages[stage]["conversion"]
+                )  # Just ensure that it is positive
                 # Set scan points and retract points (for initializing they are just the same as max points)
-                self._stage_highest_scan_point_um[channel] = self._stage_upper_limit_um[channel]
-                self._stage_lowest_scan_point_um[channel] = self._stage_lower_limit_um[channel]
+                self._stage_highest_scan_point_um[channel] = (
+                    self._stage_upper_limit_um[channel]
+                )
+                self._stage_lowest_scan_point_um[channel] = (
+                    self._stage_lower_limit_um[channel]
+                )
                 # 10 um before the highest scan point
-                self._stage_retract_point_um[channel] = self._stage_highest_scan_point_um[channel]-self._stage_conversion_um[channel]*10
+                self._stage_retract_point_um[channel] = (
+                    self._stage_highest_scan_point_um[channel]
+                    - self._stage_conversion_um[channel] * 10
+                )
                 if simulated:
-                    self._current_encoder_value[channel] = 'the encoder is simulated'
+                    self._current_encoder_value[channel] = (
+                        "the encoder is simulated"
+                    )
                 else:
-                    self._current_encoder_value[channel] = self._get_encoder_value(self.channels[self._internal_channels.index(channel)], True)
+                    self._current_encoder_value[channel] = (
+                        self._get_encoder_value(
+                            self.channels[
+                                self._internal_channels.index(channel)
+                            ],
+                            True,
+                        )
+                    )
                 # TODO: This kind of could could be used to initiate this class, probably want an entire rework though.
-                if stage == 'ZFM2020':
-                    limits  = self.supported_stages[stage]["limits"]
-                    conversion = self.supported_stages[stage]["conversion"]#
+                if stage == "ZFM2020":
+                    limits = self.supported_stages[stage]["limits"]
+                    conversion = self.supported_stages[stage]["conversion"]  #
                     # TODO: This is not correct, we want to make controller and then pass the instance to the stage rather than making the stage in the controller instance
-                    device = ZFM2020Stage(limits=limits, conversion=conversion, channel=channel, port=self.port)
+                    device = ZFM2020Stage(
+                        limits=limits,
+                        conversion=conversion,
+                        channel=channel,
+                        port=self.port,
+                    )
                     self._devices[str(channel)] = device
 
     # NOTE(ADW): The only methods required by microscope are the devices and the shutdown method, but we can reinstate everything else as well if we want to use it.
@@ -146,7 +200,6 @@ class MCM3000Controller(microscope.abc.Controller):
         # if not simulated:
         #     self.port.close()
         pass
-
 
     # def validate_channel(self, channel, internal=False):
     #     """
@@ -163,7 +216,6 @@ class MCM3000Controller(microscope.abc.Controller):
     #         assert channel in self.channels, (f'{self.name}: channel \'{channel}\' not available')
     #     else:
     #         assert channel in self._internal_channels, (f'{self.name}: channel \'{channel}\' not available')
-
 
     # def get_stages(self, channel=None, internal=False):
     #     """
@@ -241,7 +293,6 @@ class MCM3000Controller(microscope.abc.Controller):
     #     else:
     #         self.validate_channel(channel, internal)
     #         return self._current_encoder_value[self._internal_channels_dict[channel]] if not internal else self._current_encoder_value[channel]
-            
 
     # def get_stage_upper_limit_um(self, channel=None, internal=False):
     #     """
@@ -310,7 +361,6 @@ class MCM3000Controller(microscope.abc.Controller):
     #     else:
     #         self.validate_channel(channel, internal)
     #         return self._stage_highest_scan_point_um[self._internal_channels_dict[channel]] if not internal else self._stage_highest_scan_point_um[channel]
-        
 
     # def get_stage_retract_point_um(self, channel=None, internal=False):
     #     """
@@ -454,7 +504,6 @@ class MCM3000Controller(microscope.abc.Controller):
     #     self._stage_lowest_scan_point_um[self._internal_channels_dict[channel]] = -self._stage_lowest_scan_point_um[self._internal_channels_dict[channel]]
     #     self._stage_retract_point_um[self._internal_channels_dict[channel]] = -self._stage_retract_point_um[self._internal_channels_dict[channel]]
 
-
     # def _set_encoder_value_to_zero(self, channel):
     #     """
     #     Sets the current position as zero for the encoder count on a specified channel.
@@ -473,7 +522,7 @@ class MCM3000Controller(microscope.abc.Controller):
 
     #     Raises:
     #         AssertionError: If the specified channel is not available.
-        
+
     #     Note:
     #         After zeroing, it's essential to reset the motion limits, unless the zeroing
     #         operation was performed at the center of the stage's range.
@@ -616,7 +665,6 @@ class MCM3000Controller(microscope.abc.Controller):
     #             self.move_um(channel, 10, relative=True, block=True, verbose=False)
     #     return True
 
-
     # def get_position_um(self, channel, verbose=False):
     #     """
     #     Get the position in micrometers (um) for the specified channel.
@@ -669,8 +717,7 @@ class MCM3000Controller(microscope.abc.Controller):
     #         if self._stage_retract_point_um[self._internal_channels_dict[channel]] > self._stage_highest_scan_point_um[self._internal_channels_dict[channel]]:
     #                 self.set_retract_point_um(channel, self._stage_highest_scan_point_um[self._internal_channels_dict[channel]])
     #     return target_limit_um
-    
-    
+
     # def get_retract_point_um(self, channel, verbose=False):
     #     """
     #     Get the stage retract point in micrometers for the specified channel.
@@ -708,7 +755,7 @@ class MCM3000Controller(microscope.abc.Controller):
     #             target_retract_um = target_retract_um + self.get_position_um(channel)
     #     else:
     #         target_retract_um = self.get_position_um(channel)
-    #     assert self._stage_lowest_scan_point_um[self._internal_channels_dict[channel]] <= target_retract_um <= self._stage_highest_scan_point_um[self._internal_channels_dict[channel]],( 
+    #     assert self._stage_lowest_scan_point_um[self._internal_channels_dict[channel]] <= target_retract_um <= self._stage_highest_scan_point_um[self._internal_channels_dict[channel]],(
     #         f'{self.name}: ch{channel} -> requested retract point ({target_retract_um}) exceeds the stage limits ([{self._stage_lowest_scan_point_um[self._internal_channels_dict[channel]]},{self._stage_highest_scan_point_um[self._internal_channels_dict[channel]]}])')
     #     self._stage_retract_point_um[self._internal_channels_dict[channel]] = target_retract_um
     #     if verbose:
@@ -718,13 +765,13 @@ class MCM3000Controller(microscope.abc.Controller):
     # def legalize_move_um(self, channel, move_um, relative=True, verbose=True):
     #     """
     #     Checks if the desired motion is within the accepted boundaries and returns the legalized move in micrometers (um).
-        
+
     #     Args:
     #         channel (str): The channel to perform the motion on.
     #         move_um (float): The desired motion in micrometers (um).
     #         relative (bool, optional): Whether the motion is relative or absolute. Defaults to True.
     #         verbose (bool, optional): Whether to print verbose output. Defaults to True.
-        
+
     #     Returns:
     #         float: The legalized move in micrometers (um) if it is within the boundaries, None otherwise.
     #     """
@@ -841,15 +888,14 @@ class MCM3000Controller(microscope.abc.Controller):
     #     return None
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Remember starts at 1
     chnl = 1
     stage_controller = MCM3000Controller(
-        'COM3',
-        stages=('ZFM2020', None, None),
+        "COM3",
+        stages=("ZFM2020", None, None),
         reverse=(True, False, False),
-        simulated=True
+        simulated=True,
     )
     # # Read position
     # print('\n# Get position:')

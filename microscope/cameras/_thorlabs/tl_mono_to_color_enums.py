@@ -22,6 +22,7 @@ class COLOR_SPACE(_CTypesEnum):
     are both derived from the RGB color model: sRGB and Linear sRGB.
 
     """
+
     SRGB = 0
     """
     sRGB or standard RGB is a common color space used for displaying images on computer monitors or for sending images over the internet. 

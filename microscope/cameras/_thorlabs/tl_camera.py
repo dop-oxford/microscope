@@ -3,8 +3,22 @@
 tl_camera.py
 """
 
-from ctypes import cdll, create_string_buffer, POINTER, CFUNCTYPE, c_int, c_ushort, c_void_p, c_char_p, c_uint, \
-    c_char, c_double, c_bool, c_float, c_longlong
+from ctypes import (
+    cdll,
+    create_string_buffer,
+    POINTER,
+    CFUNCTYPE,
+    c_int,
+    c_ushort,
+    c_void_p,
+    c_char_p,
+    c_uint,
+    c_char,
+    c_double,
+    c_bool,
+    c_float,
+    c_longlong,
+)
 from typing import Callable, Any, Optional, NamedTuple, List
 from traceback import format_exception
 import logging
@@ -15,13 +29,21 @@ import sys
 
 import numpy as np
 
-from .tl_camera_enums import EEP_STATUS, DATA_RATE, SENSOR_TYPE, OPERATION_MODE, COMMUNICATION_INTERFACE, \
-    USB_PORT_TYPE, TRIGGER_POLARITY, TAPS
+from .tl_camera_enums import (
+    EEP_STATUS,
+    DATA_RATE,
+    SENSOR_TYPE,
+    OPERATION_MODE,
+    COMMUNICATION_INTERFACE,
+    USB_PORT_TYPE,
+    TRIGGER_POLARITY,
+    TAPS,
+)
 from .tl_color_enums import FILTER_ARRAY_PHASE
 from .tl_polarization_enums import POLAR_PHASE
 
 """ Setup logger """
-_logger = logging.getLogger('thorlabs_tsi_sdk.tl_camera')
+_logger = logging.getLogger("thorlabs_tsi_sdk.tl_camera")
 
 """ Config constants """
 _STRING_MAX = 4096  # for functions that return strings built on C char arrays, this is the max number of characters
@@ -29,7 +51,9 @@ _STRING_MAX = 4096  # for functions that return strings built on C char arrays, 
 """ Callback ctypes types """
 _camera_connect_callback_type = CFUNCTYPE(None, c_char_p, c_int, c_void_p)
 _camera_disconnect_callback_type = CFUNCTYPE(None, c_char_p, c_void_p)
-_frame_available_callback_type = CFUNCTYPE(None, c_void_p, POINTER(c_ushort), c_int, POINTER(c_char), c_int, c_void_p)
+_frame_available_callback_type = CFUNCTYPE(
+    None, c_void_p, POINTER(c_ushort), c_int, POINTER(c_char), c_int, c_void_p
+)
 # metadata is ASCII, so use c_char
 
 
@@ -48,9 +72,14 @@ def _get_last_error(sdk):
 
 def _create_c_failure_message(sdk, function_name, error_code):
     last_error = _get_last_error(sdk)
-    failure_message = "{function_name}() returned non-zero error code: {error_code}; " \
-                      "error message: {last_error}" \
-        .format(function_name=function_name, error_code=error_code, last_error=last_error)
+    failure_message = (
+        "{function_name}() returned non-zero error code: {error_code}; "
+        "error message: {last_error}".format(
+            function_name=function_name,
+            error_code=error_code,
+            last_error=last_error,
+        )
+    )
     return failure_message
 
 
@@ -64,7 +93,9 @@ class Frame(object):
 
     """
 
-    def __init__(self, image_buffer, frame_count, time_stamp_relative_ns_or_null):
+    def __init__(
+        self, image_buffer, frame_count, time_stamp_relative_ns_or_null
+    ):
         #  image_buffer._wrapper = self
         self._image_buffer = image_buffer
         self._frame_count = int(frame_count.value)
@@ -108,8 +139,7 @@ class Frame(object):
 
 """ NamedTuple classes"""
 
-Range = NamedTuple("Range", [('min', Any),
-                             ('max', Any)])
+Range = NamedTuple("Range", [("min", Any), ("max", Any)])
 """
 
 Represents a range of values with a min and max. These objects are derived from NamedTuple and follow tuple
@@ -117,10 +147,15 @@ semantics.
 
 """
 
-ROI = NamedTuple("ROI", [('upper_left_x_pixels', int),
-                         ('upper_left_y_pixels', int),
-                         ('lower_right_x_pixels', int),
-                         ('lower_right_y_pixels', int)])
+ROI = NamedTuple(
+    "ROI",
+    [
+        ("upper_left_x_pixels", int),
+        ("upper_left_y_pixels", int),
+        ("lower_right_x_pixels", int),
+        ("lower_right_y_pixels", int),
+    ],
+)
 """
 
 Represents the Region of Interest used by the camera. ROI is represented by two (x, y) coordinates that specify an
@@ -128,14 +163,19 @@ upper left coordinate and a lower right coordinate. The camera will create a rec
 points. These objects are derived from NamedTuple and follow tuple semantics.
 
 """
-ROIRange = NamedTuple("ROIRange", [('upper_left_x_pixels_min', int),
-                                   ('upper_left_y_pixels_min', int),
-                                   ('lower_right_x_pixels_min', int),
-                                   ('lower_right_y_pixels_min', int),
-                                   ('upper_left_x_pixels_max', int),
-                                   ('upper_left_y_pixels_max', int),
-                                   ('lower_right_x_pixels_max', int),
-                                   ('lower_right_y_pixels_max', int)])
+ROIRange = NamedTuple(
+    "ROIRange",
+    [
+        ("upper_left_x_pixels_min", int),
+        ("upper_left_y_pixels_min", int),
+        ("lower_right_x_pixels_min", int),
+        ("lower_right_y_pixels_min", int),
+        ("upper_left_x_pixels_max", int),
+        ("upper_left_y_pixels_max", int),
+        ("lower_right_x_pixels_max", int),
+        ("lower_right_y_pixels_max", int),
+    ],
+)
 """
 
 Represents the range of the Region of Interest used by the camera. ROI is represented by two (x, y) coordinates that
@@ -148,7 +188,7 @@ follow tuple semantics.
 """ Other ctypes types """
 
 # noinspection PyTypeChecker
-_3x3Matrix_float = (c_float * 9)
+_3x3Matrix_float = c_float * 9
 
 """ Classes """
 
@@ -163,153 +203,446 @@ class TLCameraSDK(object):
 
     """
 
-    _is_sdk_open = False  # is SDK DLL currently being accessed by a TLCameraSDK instance
+    _is_sdk_open = (
+        False  # is SDK DLL currently being accessed by a TLCameraSDK instance
+    )
 
     def __init__(self):
         # type: (type(None)) -> None
         self._disposed = True
 
         if TLCameraSDK._is_sdk_open:
-            raise TLCameraError("TLCameraSDK is already in use. Please dispose of the current instance before"
-                                " trying to create another")
+            raise TLCameraError(
+                "TLCameraSDK is already in use. Please dispose of the current instance before"
+                " trying to create another"
+            )
 
         try:
-            if platform.system() == 'Windows':
+            if platform.system() == "Windows":
                 self._sdk = cdll.LoadLibrary(r"thorlabs_tsi_camera_sdk.dll")
-            elif platform.system() == 'Linux':
+            elif platform.system() == "Linux":
                 try:
-                    self._sdk = cdll.LoadLibrary(r"./libthorlabs_tsi_camera_sdk.so")
+                    self._sdk = cdll.LoadLibrary(
+                        r"./libthorlabs_tsi_camera_sdk.so"
+                    )
                 except OSError:
-                    self._sdk = cdll.LoadLibrary(r"libthorlabs_tsi_camera_sdk.so")
+                    self._sdk = cdll.LoadLibrary(
+                        r"libthorlabs_tsi_camera_sdk.so"
+                    )
             else:
-                raise TLCameraError("{system} is not a supported platform.".format(system=platform.system()))
+                raise TLCameraError(
+                    "{system} is not a supported platform.".format(
+                        system=platform.system()
+                    )
+                )
             self._disposed = False
         except OSError as os_error:
-            raise TLCameraError(str(os_error) +
-                                "\nUnable to load library - are the thorlabs tsi camera sdk libraries "
-                                "discoverable from the application directory? Try placing them in the same "
-                                "directory as your program, or adding the directory with the libraries to the "
-                                "PATH. Make sure to use 32-bit libraries when using a 32-bit python interpreter "
-                                "and 64-bit libraries when using a 64-bit interpreter.\n")
+            raise TLCameraError(
+                str(os_error)
+                + "\nUnable to load library - are the thorlabs tsi camera sdk libraries "
+                "discoverable from the application directory? Try placing them in the same "
+                "directory as your program, or adding the directory with the libraries to the "
+                "PATH. Make sure to use 32-bit libraries when using a 32-bit python interpreter "
+                "and 64-bit libraries when using a 64-bit interpreter.\n"
+            )
 
         error_code = self._sdk.tl_camera_open_sdk()
         if error_code != 0:
-            raise TLCameraError("tl_camera_open_sdk() returned error code: {error_code}\n"
-                                .format(error_code=error_code))
+            raise TLCameraError(
+                "tl_camera_open_sdk() returned error code: {error_code}\n".format(
+                    error_code=error_code
+                )
+            )
         TLCameraSDK._is_sdk_open = True
         self._current_camera_connect_callback = None
         self._current_camera_disconnect_callback = None
 
         try:
-            """ set C function argument types """
-            self._sdk.tl_camera_discover_available_cameras.argtypes = [c_char_p, c_int]
-            self._sdk.tl_camera_open_camera.argtypes = [c_char_p, POINTER(c_void_p)]
-            self._sdk.tl_camera_set_camera_connect_callback.argtypes = [_camera_connect_callback_type, c_void_p]
-            self._sdk.tl_camera_set_camera_disconnect_callback.argtypes = [_camera_disconnect_callback_type, c_void_p]
+            """set C function argument types"""
+            self._sdk.tl_camera_discover_available_cameras.argtypes = [
+                c_char_p,
+                c_int,
+            ]
+            self._sdk.tl_camera_open_camera.argtypes = [
+                c_char_p,
+                POINTER(c_void_p),
+            ]
+            self._sdk.tl_camera_set_camera_connect_callback.argtypes = [
+                _camera_connect_callback_type,
+                c_void_p,
+            ]
+            self._sdk.tl_camera_set_camera_disconnect_callback.argtypes = [
+                _camera_disconnect_callback_type,
+                c_void_p,
+            ]
             self._sdk.tl_camera_close_camera.argtypes = [c_void_p]
-            self._sdk.tl_camera_set_frame_available_callback.argtypes = [c_void_p, _frame_available_callback_type,
-                                                                         c_void_p]
-            self._sdk.tl_camera_get_pending_frame_or_null.argtypes = [c_void_p, POINTER(POINTER(c_ushort)),
-                                                                      POINTER(c_int), POINTER(POINTER(c_char)),
-                                                                      POINTER(c_int)]
-            self._sdk.tl_camera_get_measured_frame_rate.argtypes = [c_void_p, POINTER(c_double)]
-            self._sdk.tl_camera_get_is_data_rate_supported.argtypes = [c_void_p, c_int, POINTER(c_bool)]
-            self._sdk.tl_camera_get_is_taps_supported.argtypes = [c_void_p, POINTER(c_bool), c_int]
-            self._sdk.tl_camera_get_color_correction_matrix.argtypes = [c_void_p, POINTER(_3x3Matrix_float)]
-            self._sdk.tl_camera_get_default_white_balance_matrix.argtypes = [c_void_p, POINTER(_3x3Matrix_float)]
+            self._sdk.tl_camera_set_frame_available_callback.argtypes = [
+                c_void_p,
+                _frame_available_callback_type,
+                c_void_p,
+            ]
+            self._sdk.tl_camera_get_pending_frame_or_null.argtypes = [
+                c_void_p,
+                POINTER(POINTER(c_ushort)),
+                POINTER(c_int),
+                POINTER(POINTER(c_char)),
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_measured_frame_rate.argtypes = [
+                c_void_p,
+                POINTER(c_double),
+            ]
+            self._sdk.tl_camera_get_is_data_rate_supported.argtypes = [
+                c_void_p,
+                c_int,
+                POINTER(c_bool),
+            ]
+            self._sdk.tl_camera_get_is_taps_supported.argtypes = [
+                c_void_p,
+                POINTER(c_bool),
+                c_int,
+            ]
+            self._sdk.tl_camera_get_color_correction_matrix.argtypes = [
+                c_void_p,
+                POINTER(_3x3Matrix_float),
+            ]
+            self._sdk.tl_camera_get_default_white_balance_matrix.argtypes = [
+                c_void_p,
+                POINTER(_3x3Matrix_float),
+            ]
             self._sdk.tl_camera_arm.argtypes = [c_void_p, c_int]
             self._sdk.tl_camera_issue_software_trigger.argtypes = [c_void_p]
             self._sdk.tl_camera_disarm.argtypes = [c_void_p]
-            self._sdk.tl_camera_get_exposure_time.argtypes = [c_void_p, POINTER(c_longlong)]
-            self._sdk.tl_camera_set_exposure_time.argtypes = [c_void_p, c_longlong]
-            self._sdk.tl_camera_get_image_poll_timeout.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_set_image_poll_timeout.argtypes = [c_void_p, c_int]
-            self._sdk.tl_camera_get_exposure_time_range.argtypes = [c_void_p, POINTER(c_longlong), POINTER(c_longlong)]
-            self._sdk.tl_camera_get_firmware_version.argtypes = [c_void_p, c_char_p, c_int]
-            self._sdk.tl_camera_get_frame_time.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_get_trigger_polarity.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_set_trigger_polarity.argtypes = [c_void_p, c_int]
+            self._sdk.tl_camera_get_exposure_time.argtypes = [
+                c_void_p,
+                POINTER(c_longlong),
+            ]
+            self._sdk.tl_camera_set_exposure_time.argtypes = [
+                c_void_p,
+                c_longlong,
+            ]
+            self._sdk.tl_camera_get_image_poll_timeout.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_set_image_poll_timeout.argtypes = [
+                c_void_p,
+                c_int,
+            ]
+            self._sdk.tl_camera_get_exposure_time_range.argtypes = [
+                c_void_p,
+                POINTER(c_longlong),
+                POINTER(c_longlong),
+            ]
+            self._sdk.tl_camera_get_firmware_version.argtypes = [
+                c_void_p,
+                c_char_p,
+                c_int,
+            ]
+            self._sdk.tl_camera_get_frame_time.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_trigger_polarity.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_set_trigger_polarity.argtypes = [
+                c_void_p,
+                c_int,
+            ]
             self._sdk.tl_camera_get_binx.argtypes = [c_void_p, POINTER(c_int)]
             self._sdk.tl_camera_set_binx.argtypes = [c_void_p, c_int]
-            self._sdk.tl_camera_get_sensor_readout_time.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_get_binx_range.argtypes = [c_void_p, POINTER(c_int), POINTER(c_int)]
-            self._sdk.tl_camera_get_is_hot_pixel_correction_enabled.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_set_is_hot_pixel_correction_enabled.argtypes = [c_void_p, c_int]
-            self._sdk.tl_camera_get_hot_pixel_correction_threshold.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_set_hot_pixel_correction_threshold.argtypes = [c_void_p, c_int]
-            self._sdk.tl_camera_get_hot_pixel_correction_threshold_range.argtypes = [c_void_p, POINTER(c_int),
-                                                                                     POINTER(c_int)]
-            self._sdk.tl_camera_get_sensor_width.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_get_gain_range.argtypes = [c_void_p, POINTER(c_int), POINTER(c_int)]
-            self._sdk.tl_camera_get_image_width_range.argtypes = [c_void_p, POINTER(c_int), POINTER(c_int)]
-            self._sdk.tl_camera_get_sensor_height.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_get_image_height_range.argtypes = [c_void_p, POINTER(c_int), POINTER(c_int)]
-            self._sdk.tl_camera_get_model.argtypes = [c_void_p, c_char_p, c_int]
+            self._sdk.tl_camera_get_sensor_readout_time.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_binx_range.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_is_hot_pixel_correction_enabled.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_set_is_hot_pixel_correction_enabled.argtypes = [
+                c_void_p,
+                c_int,
+            ]
+            self._sdk.tl_camera_get_hot_pixel_correction_threshold.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_set_hot_pixel_correction_threshold.argtypes = [
+                c_void_p,
+                c_int,
+            ]
+            self._sdk.tl_camera_get_hot_pixel_correction_threshold_range.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_sensor_width.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_gain_range.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_image_width_range.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_sensor_height.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_image_height_range.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_model.argtypes = [
+                c_void_p,
+                c_char_p,
+                c_int,
+            ]
             self._sdk.tl_camera_get_name.argtypes = [c_void_p, c_char_p, c_int]
             self._sdk.tl_camera_set_name.argtypes = [c_void_p, c_char_p]
-            self._sdk.tl_camera_get_name_string_length_range.argtypes = [c_void_p, POINTER(c_int), POINTER(c_int)]
-            self._sdk.tl_camera_get_frames_per_trigger_zero_for_unlimited.argtypes = [c_void_p, POINTER(c_uint)]
-            self._sdk.tl_camera_set_frames_per_trigger_zero_for_unlimited.argtypes = [c_void_p, c_uint]
-            self._sdk.tl_camera_get_frames_per_trigger_range.argtypes = [c_void_p, POINTER(c_uint), POINTER(c_uint)]
-            self._sdk.tl_camera_get_usb_port_type.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_get_communication_interface.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_get_operation_mode.argtypes = [c_void_p, POINTER(c_int)]
+            self._sdk.tl_camera_get_name_string_length_range.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_frames_per_trigger_zero_for_unlimited.argtypes = [
+                c_void_p,
+                POINTER(c_uint),
+            ]
+            self._sdk.tl_camera_set_frames_per_trigger_zero_for_unlimited.argtypes = [
+                c_void_p,
+                c_uint,
+            ]
+            self._sdk.tl_camera_get_frames_per_trigger_range.argtypes = [
+                c_void_p,
+                POINTER(c_uint),
+                POINTER(c_uint),
+            ]
+            self._sdk.tl_camera_get_usb_port_type.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_communication_interface.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_operation_mode.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
             self._sdk.tl_camera_set_operation_mode.argtypes = [c_void_p, c_int]
-            self._sdk.tl_camera_get_is_armed.argtypes = [c_void_p, POINTER(c_bool)]
-            self._sdk.tl_camera_get_is_eep_supported.argtypes = [c_void_p, POINTER(c_bool)]
-            self._sdk.tl_camera_get_is_led_supported.argtypes = [c_void_p, POINTER(c_bool)]
-            self._sdk.tl_camera_get_is_cooling_supported.argtypes = [c_void_p, POINTER(c_bool)]
-            self._sdk.tl_camera_get_is_cooling_enabled.argtypes = [c_void_p, POINTER(c_bool)]
-            self._sdk.tl_camera_get_is_nir_boost_supported.argtypes = [c_void_p, POINTER(c_bool)]
-            self._sdk.tl_camera_get_camera_sensor_type.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_get_color_filter_array_phase.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_get_camera_color_correction_matrix_output_color_space.argtypes = [c_void_p, c_char_p]
-            self._sdk.tl_camera_get_data_rate.argtypes = [c_void_p, POINTER(c_int)]
+            self._sdk.tl_camera_get_is_armed.argtypes = [
+                c_void_p,
+                POINTER(c_bool),
+            ]
+            self._sdk.tl_camera_get_is_eep_supported.argtypes = [
+                c_void_p,
+                POINTER(c_bool),
+            ]
+            self._sdk.tl_camera_get_is_led_supported.argtypes = [
+                c_void_p,
+                POINTER(c_bool),
+            ]
+            self._sdk.tl_camera_get_is_cooling_supported.argtypes = [
+                c_void_p,
+                POINTER(c_bool),
+            ]
+            self._sdk.tl_camera_get_is_cooling_enabled.argtypes = [
+                c_void_p,
+                POINTER(c_bool),
+            ]
+            self._sdk.tl_camera_get_is_nir_boost_supported.argtypes = [
+                c_void_p,
+                POINTER(c_bool),
+            ]
+            self._sdk.tl_camera_get_camera_sensor_type.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_color_filter_array_phase.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_camera_color_correction_matrix_output_color_space.argtypes = [
+                c_void_p,
+                c_char_p,
+            ]
+            self._sdk.tl_camera_get_data_rate.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
             self._sdk.tl_camera_set_data_rate.argtypes = [c_void_p, c_int]
-            self._sdk.tl_camera_get_sensor_pixel_size_bytes.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_get_sensor_pixel_width.argtypes = [c_void_p, POINTER(c_double)]
-            self._sdk.tl_camera_get_sensor_pixel_height.argtypes = [c_void_p, POINTER(c_double)]
-            self._sdk.tl_camera_get_bit_depth.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_get_roi.argtypes = [c_void_p, POINTER(c_int), POINTER(c_int), POINTER(c_int),
-                                                    POINTER(c_int)]
-            self._sdk.tl_camera_set_roi.argtypes = [c_void_p, c_int, c_int, c_int, c_int]
-            self._sdk.tl_camera_get_roi_range.argtypes = [c_void_p, POINTER(c_int), POINTER(c_int), POINTER(c_int),
-                                                          POINTER(c_int), POINTER(c_int), POINTER(c_int),
-                                                          POINTER(c_int), POINTER(c_int)]
-            self._sdk.tl_camera_get_serial_number.argtypes = [c_void_p, c_char_p, c_int]
-            self._sdk.tl_camera_get_serial_number_string_length_range.argtypes = [c_void_p, POINTER(c_int),
-                                                                                  POINTER(c_int)]
-            self._sdk.tl_camera_get_is_led_on.argtypes = [c_void_p, POINTER(c_bool)]
+            self._sdk.tl_camera_get_sensor_pixel_size_bytes.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_sensor_pixel_width.argtypes = [
+                c_void_p,
+                POINTER(c_double),
+            ]
+            self._sdk.tl_camera_get_sensor_pixel_height.argtypes = [
+                c_void_p,
+                POINTER(c_double),
+            ]
+            self._sdk.tl_camera_get_bit_depth.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_roi.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+                POINTER(c_int),
+                POINTER(c_int),
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_set_roi.argtypes = [
+                c_void_p,
+                c_int,
+                c_int,
+                c_int,
+                c_int,
+            ]
+            self._sdk.tl_camera_get_roi_range.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+                POINTER(c_int),
+                POINTER(c_int),
+                POINTER(c_int),
+                POINTER(c_int),
+                POINTER(c_int),
+                POINTER(c_int),
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_serial_number.argtypes = [
+                c_void_p,
+                c_char_p,
+                c_int,
+            ]
+            self._sdk.tl_camera_get_serial_number_string_length_range.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_is_led_on.argtypes = [
+                c_void_p,
+                POINTER(c_bool),
+            ]
             self._sdk.tl_camera_set_is_led_on.argtypes = [c_void_p, c_bool]
-            self._sdk.tl_camera_get_eep_status.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_set_is_eep_enabled.argtypes = [c_void_p, c_bool]
+            self._sdk.tl_camera_get_eep_status.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_set_is_eep_enabled.argtypes = [
+                c_void_p,
+                c_bool,
+            ]
             self._sdk.tl_camera_get_biny.argtypes = [c_void_p, POINTER(c_int)]
             self._sdk.tl_camera_set_biny.argtypes = [c_void_p, c_int]
-            self._sdk.tl_camera_get_biny_range.argtypes = [c_void_p, POINTER(c_int), POINTER(c_int)]
+            self._sdk.tl_camera_get_biny_range.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+                POINTER(c_int),
+            ]
             self._sdk.tl_camera_get_gain.argtypes = [c_void_p, POINTER(c_int)]
             self._sdk.tl_camera_set_gain.argtypes = [c_void_p, c_int]
-            self._sdk.tl_camera_get_black_level.argtypes = [c_void_p, POINTER(c_int)]
+            self._sdk.tl_camera_get_black_level.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
             self._sdk.tl_camera_set_black_level.argtypes = [c_void_p, c_int]
-            self._sdk.tl_camera_get_black_level_range.argtypes = [c_void_p, POINTER(c_int), POINTER(c_int)]
-            self._sdk.tl_camera_get_frames_per_trigger_zero_for_unlimited.argtypes = [c_void_p, POINTER(c_uint)]
-            self._sdk.tl_camera_set_frames_per_trigger_zero_for_unlimited.argtypes = [c_void_p, c_uint]
-            self._sdk.tl_camera_get_frames_per_trigger_range.argtypes = [c_void_p, POINTER(c_uint), POINTER(c_uint)]
-            self._sdk.tl_camera_get_image_width.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_get_image_height.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_get_polar_phase.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_get_frame_rate_control_value_range.argtypes = [c_void_p, POINTER(c_double), POINTER(c_double)]
-            self._sdk.tl_camera_get_is_frame_rate_control_enabled.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_set_is_frame_rate_control_enabled.argtypes = [c_void_p, c_int]
-            self._sdk.tl_camera_get_frame_rate_control_value.argtypes = [c_void_p, POINTER(c_double)]
-            self._sdk.tl_camera_set_frame_rate_control_value.argtypes = [c_void_p, c_double]
-            self._sdk.tl_camera_get_timestamp_clock_frequency.argtypes = [c_void_p, POINTER(c_int)]
-            self._sdk.tl_camera_convert_gain_to_decibels.argtypes = [c_void_p, c_int, POINTER(c_double)]
-            self._sdk.tl_camera_convert_decibels_to_gain.argtypes = [c_void_p, c_double, POINTER(c_int)]
-            self._sdk.tl_camera_get_is_operation_mode_supported.argtypes = [c_void_p, c_int, POINTER(c_bool)]
+            self._sdk.tl_camera_get_black_level_range.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_frames_per_trigger_zero_for_unlimited.argtypes = [
+                c_void_p,
+                POINTER(c_uint),
+            ]
+            self._sdk.tl_camera_set_frames_per_trigger_zero_for_unlimited.argtypes = [
+                c_void_p,
+                c_uint,
+            ]
+            self._sdk.tl_camera_get_frames_per_trigger_range.argtypes = [
+                c_void_p,
+                POINTER(c_uint),
+                POINTER(c_uint),
+            ]
+            self._sdk.tl_camera_get_image_width.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_image_height.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_polar_phase.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_frame_rate_control_value_range.argtypes = [
+                c_void_p,
+                POINTER(c_double),
+                POINTER(c_double),
+            ]
+            self._sdk.tl_camera_get_is_frame_rate_control_enabled.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_set_is_frame_rate_control_enabled.argtypes = [
+                c_void_p,
+                c_int,
+            ]
+            self._sdk.tl_camera_get_frame_rate_control_value.argtypes = [
+                c_void_p,
+                POINTER(c_double),
+            ]
+            self._sdk.tl_camera_set_frame_rate_control_value.argtypes = [
+                c_void_p,
+                c_double,
+            ]
+            self._sdk.tl_camera_get_timestamp_clock_frequency.argtypes = [
+                c_void_p,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_convert_gain_to_decibels.argtypes = [
+                c_void_p,
+                c_int,
+                POINTER(c_double),
+            ]
+            self._sdk.tl_camera_convert_decibels_to_gain.argtypes = [
+                c_void_p,
+                c_double,
+                POINTER(c_int),
+            ]
+            self._sdk.tl_camera_get_is_operation_mode_supported.argtypes = [
+                c_void_p,
+                c_int,
+                POINTER(c_bool),
+            ]
 
             self._sdk.tl_camera_get_last_error.restype = c_char_p
             # noinspection PyProtectedMember
-            self._sdk._internal_command.argtypes = [c_void_p, c_char_p, c_uint, c_char_p, c_uint]
+            self._sdk._internal_command.argtypes = [
+                c_void_p,
+                c_char_p,
+                c_uint,
+                c_char_p,
+                c_uint,
+            ]
         except Exception as exception:
             _logger.error("SDK initialization failed; " + str(exception))
             raise exception
@@ -324,7 +657,13 @@ class TLCameraSDK(object):
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
         if exception_type is not None:
-            _logger.debug("".join(format_exception(exception_type, exception_value, exception_traceback)))
+            _logger.debug(
+                "".join(
+                    format_exception(
+                        exception_type, exception_value, exception_traceback
+                    )
+                )
+            )
         self.dispose()
         return True if exception_type is None else False
 
@@ -342,7 +681,11 @@ class TLCameraSDK(object):
                 return
             error_code = self._sdk.tl_camera_close_sdk()
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_close_sdk", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_close_sdk", error_code
+                    )
+                )
             TLCameraSDK._is_sdk_open = False
             self._disposed = True
             self._current_camera_connect_callback = None
@@ -359,13 +702,22 @@ class TLCameraSDK(object):
         """
         try:
             string_buffer = create_string_buffer(_STRING_MAX)
-            error_code = self._sdk.tl_camera_discover_available_cameras(string_buffer, _STRING_MAX)
+            error_code = self._sdk.tl_camera_discover_available_cameras(
+                string_buffer, _STRING_MAX
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_discover_available_cameras",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_discover_available_cameras",
+                        error_code,
+                    )
+                )
             return string_buffer.value.decode("utf-8").split()
         except Exception as exception:
-            _logger.error("discover_available_cameras failed; " + str(exception))
+            _logger.error(
+                "discover_available_cameras failed; " + str(exception)
+            )
             raise exception
 
     def open_camera(self, camera_serial_number):
@@ -378,34 +730,51 @@ class TLCameraSDK(object):
 
         """
         try:
-            serial_number_bytes = camera_serial_number.encode("utf-8") + b'\0'
+            serial_number_bytes = camera_serial_number.encode("utf-8") + b"\0"
             c_camera_handle = c_void_p()  # void *
-            error_code = self._sdk.tl_camera_open_camera(serial_number_bytes, c_camera_handle)
+            error_code = self._sdk.tl_camera_open_camera(
+                serial_number_bytes, c_camera_handle
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_open_camera", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_open_camera", error_code
+                    )
+                )
             # noinspection PyProtectedMember
             return TLCamera._create(self._sdk, c_camera_handle)
         except Exception as exception:
-            _logger.error("Could not open camera '{serial_number}'; {exception}".format(
-                serial_number=str(camera_serial_number),
-                exception=str(exception)))
+            _logger.error(
+                "Could not open camera '{serial_number}'; {exception}".format(
+                    serial_number=str(camera_serial_number),
+                    exception=str(exception),
+                )
+            )
             raise exception
 
     @staticmethod
     def _generate_camera_connect_callback(_callback, *args, **kwargs):
         # warning that context is unused suppressed - it must be in the function signature to match native function call
         # noinspection PyUnusedLocal
-        def camera_connect_callback(camera_serial_number, usb_port_type, context):
-            _callback(str(camera_serial_number.decode('utf-8')), USB_PORT_TYPE(usb_port_type), *args, **kwargs)
+        def camera_connect_callback(
+            camera_serial_number, usb_port_type, context
+        ):
+            _callback(
+                str(camera_serial_number.decode("utf-8")),
+                USB_PORT_TYPE(usb_port_type),
+                *args,
+                **kwargs,
+            )
 
         return _camera_connect_callback_type(camera_connect_callback)
 
-    def set_camera_connect_callback(self,
-                                    handler,
-                                    # type: Callable[[str, USB_PORT_TYPE, Optional[Any], Optional[Any]], type(None)]
-                                    *args,  # type: Optional[Any]
-                                    **kwargs  # type: Optional[Any]
-                                    ):  # type: (...) -> None
+    def set_camera_connect_callback(
+        self,
+        handler,
+        # type: Callable[[str, USB_PORT_TYPE, Optional[Any], Optional[Any]], type(None)]
+        *args,  # type: Optional[Any]
+        **kwargs,  # type: Optional[Any]
+    ):  # type: (...) -> None
         """
         Sets the callback function for camera connection events. Whenever a USB camera is connected, the provided
         handler will be called along with any specified arguments and keyword arguments.
@@ -420,14 +789,27 @@ class TLCameraSDK(object):
 
         """
         try:
-            callback = self._generate_camera_connect_callback(handler, *args, **kwargs)
-            error_code = self._sdk.tl_camera_set_camera_connect_callback(callback, None)
+            callback = self._generate_camera_connect_callback(
+                handler, *args, **kwargs
+            )
+            error_code = self._sdk.tl_camera_set_camera_connect_callback(
+                callback, None
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_camera_connect_callback",
-                                                              error_code))
-            self._current_camera_connect_callback = callback  # reference the callback so python doesn't delete it
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_set_camera_connect_callback",
+                        error_code,
+                    )
+                )
+            self._current_camera_connect_callback = (
+                callback  # reference the callback so python doesn't delete it
+            )
         except Exception as exception:
-            _logger.error("Could not set camera connect callback; " + str(exception))
+            _logger.error(
+                "Could not set camera connect callback; " + str(exception)
+            )
             raise exception
 
     @staticmethod
@@ -435,16 +817,19 @@ class TLCameraSDK(object):
         # warning that context is unused suppressed - it must be in the function signature to match native function call
         # noinspection PyUnusedLocal
         def camera_disconnect_callback(camera_serial_number, context):
-            _callback(str(camera_serial_number.decode('utf-8')), *args, **kwargs)
+            _callback(
+                str(camera_serial_number.decode("utf-8")), *args, **kwargs
+            )
 
         return _camera_disconnect_callback_type(camera_disconnect_callback)
 
-    def set_camera_disconnect_callback(self,
-                                       handler,
-                                       # type: Callable[[str, Optional[Any], Optional[Any]], type(None)]
-                                       *args,  # type: Optional[Any]
-                                       **kwargs  # type: Optional[Any]
-                                       ):  # type: (...) -> None
+    def set_camera_disconnect_callback(
+        self,
+        handler,
+        # type: Callable[[str, Optional[Any], Optional[Any]], type(None)]
+        *args,  # type: Optional[Any]
+        **kwargs,  # type: Optional[Any]
+    ):  # type: (...) -> None
         """
         Sets the callback function for camera disconnection events. Whenever a USB camera is disconnected, the
         provided handler will be called along with any specified arguments and keyword arguments
@@ -459,14 +844,27 @@ class TLCameraSDK(object):
 
         """
         try:
-            callback = self._generate_camera_disconnect_callback(handler, *args, **kwargs)
-            error_code = self._sdk.tl_camera_set_camera_disconnect_callback(callback, None)
+            callback = self._generate_camera_disconnect_callback(
+                handler, *args, **kwargs
+            )
+            error_code = self._sdk.tl_camera_set_camera_disconnect_callback(
+                callback, None
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_camera_disconnect_callback",
-                                                              error_code))
-            self._current_camera_disconnect_callback = callback  # reference the callback so python doesn't delete it
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_set_camera_disconnect_callback",
+                        error_code,
+                    )
+                )
+            self._current_camera_disconnect_callback = (
+                callback  # reference the callback so python doesn't delete it
+            )
         except Exception as exception:
-            _logger.error("Could not set camera disconnect callback; " + str(exception))
+            _logger.error(
+                "Could not set camera disconnect callback; " + str(exception)
+            )
             raise exception
 
 
@@ -493,8 +891,10 @@ class TLCamera(object):
         # type: (type(object), Any, Any) -> None
         try:
             self._disposed = True
-            assert (key == TLCamera.__key), "TLCamera objects cannot be created manually. Please use " \
-                                            "TLCameraSDK.open_camera to acquire new TLCamera objects."
+            assert key == TLCamera.__key, (
+                "TLCamera objects cannot be created manually. Please use "
+                "TLCameraSDK.open_camera to acquire new TLCamera objects."
+            )
             self._sdk = sdk
             self._camera = camera
             self._current_frame_available_callback = None
@@ -516,7 +916,13 @@ class TLCamera(object):
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
         if exception_type is not None:
-            _logger.debug("".join(format_exception(exception_type, exception_value, exception_traceback)))
+            _logger.debug(
+                "".join(
+                    format_exception(
+                        exception_type, exception_value, exception_traceback
+                    )
+                )
+            )
         self.dispose()
         return True if exception_type is None else False
 
@@ -535,7 +941,11 @@ class TLCamera(object):
                 _logger.error("Could not disarm camera.")
             error_code = self._sdk.tl_camera_close_camera(self._camera)
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_close_camera", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_close_camera", error_code
+                    )
+                )
             self._disposed = True
             self._current_frame_available_callback = None
         except Exception as exception:
@@ -560,46 +970,82 @@ class TLCamera(object):
             frame_count = c_int()
             metadata_pointer = POINTER(c_char)()
             metadata_size_in_bytes = c_int()
-            error_code = self._sdk.tl_camera_get_pending_frame_or_null(self._camera, image_buffer, frame_count,
-                                                                       metadata_pointer, metadata_size_in_bytes)
+            error_code = self._sdk.tl_camera_get_pending_frame_or_null(
+                self._camera,
+                image_buffer,
+                frame_count,
+                metadata_pointer,
+                metadata_size_in_bytes,
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_pending_frame_or_null",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_pending_frame_or_null",
+                        error_code,
+                    )
+                )
             if not image_buffer:
                 return None
 
             image_buffer._wrapper = self  # image buffer needs a reference to this instance or it may get deleted
-            image_buffer_as_np_array = np.ctypeslib.as_array(image_buffer, shape=(self._local_image_height_pixels,
-                                                                                  self._local_image_width_pixels))
+            image_buffer_as_np_array = np.ctypeslib.as_array(
+                image_buffer,
+                shape=(
+                    self._local_image_height_pixels,
+                    self._local_image_width_pixels,
+                ),
+            )
             time_stamp_relative_ns = None
             metadata_size_in_bytes = metadata_size_in_bytes.value
-            if metadata_size_in_bytes > 0 and self._local_timestamp_clock_frequency is not None:
+            if (
+                metadata_size_in_bytes > 0
+                and self._local_timestamp_clock_frequency is not None
+            ):
                 if sys.version_info.major < 3:
-                    metadata = bytearray(np.ctypeslib.as_array(metadata_pointer, shape=(metadata_size_in_bytes,)))
+                    metadata = bytearray(
+                        np.ctypeslib.as_array(
+                            metadata_pointer, shape=(metadata_size_in_bytes,)
+                        )
+                    )
                 else:
-                    metadata = bytes(np.ctypeslib.as_array(metadata_pointer, shape=(metadata_size_in_bytes,)))
-                metadata_chunks = [metadata[i:i+8] for i in range(0, len(metadata), 8)]
+                    metadata = bytes(
+                        np.ctypeslib.as_array(
+                            metadata_pointer, shape=(metadata_size_in_bytes,)
+                        )
+                    )
+                metadata_chunks = [
+                    metadata[i : i + 8] for i in range(0, len(metadata), 8)
+                ]
                 pixel_clock_high = -1
                 pixel_clock_low = -1
                 for metadata_chunk in metadata_chunks:
                     tag = metadata_chunk[0:4]
-                    value = struct.unpack('<I', metadata_chunk[4:8])[0]
-                    if tag == b'PCKH':
+                    value = struct.unpack("<I", metadata_chunk[4:8])[0]
+                    if tag == b"PCKH":
                         pixel_clock_high = value
-                    elif tag == b'PCKL':
+                    elif tag == b"PCKL":
                         pixel_clock_low = value
-                    elif tag == b'ENDT':
+                    elif tag == b"ENDT":
                         break
                 # if PCKH or PCKL weren't found, pixel clock is invalid.
                 if pixel_clock_high > -1 and pixel_clock_low > -1:
                     pixel_clock = (pixel_clock_high << 32) | pixel_clock_low
-                    time_stamp_relative_ns = \
-                        int((decimal.Decimal(pixel_clock) / decimal.Decimal(self._local_timestamp_clock_frequency))
-                            * 1000000000)
+                    time_stamp_relative_ns = int(
+                        (
+                            decimal.Decimal(pixel_clock)
+                            / decimal.Decimal(
+                                self._local_timestamp_clock_frequency
+                            )
+                        )
+                        * 1000000000
+                    )
 
-            frame = Frame(image_buffer=image_buffer_as_np_array,
-                          frame_count=frame_count,
-                          time_stamp_relative_ns_or_null=time_stamp_relative_ns)
+            frame = Frame(
+                image_buffer=image_buffer_as_np_array,
+                frame_count=frame_count,
+                time_stamp_relative_ns_or_null=time_stamp_relative_ns,
+            )
 
             return frame
         except Exception as exception:
@@ -618,13 +1064,22 @@ class TLCamera(object):
         """
         try:
             frames_per_second = c_double()
-            error_code = self._sdk.tl_camera_get_measured_frame_rate(self._camera, frames_per_second)
+            error_code = self._sdk.tl_camera_get_measured_frame_rate(
+                self._camera, frames_per_second
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_measured_frame_rate",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_measured_frame_rate",
+                        error_code,
+                    )
+                )
             return float(frames_per_second.value)
         except Exception as exception:
-            _logger.error("Could not get measured frame rate; " + str(exception))
+            _logger.error(
+                "Could not get measured frame rate; " + str(exception)
+            )
             raise exception
 
     def get_is_data_rate_supported(self, data_rate):
@@ -641,12 +1096,20 @@ class TLCamera(object):
         try:
             c_value = c_int(data_rate)
             is_supported = c_bool()
-            error_code = self._sdk.tl_camera_get_is_data_rate_supported(self._camera, c_value, is_supported)
+            error_code = self._sdk.tl_camera_get_is_data_rate_supported(
+                self._camera, c_value, is_supported
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "get_is_data_rate_supported", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "get_is_data_rate_supported", error_code
+                    )
+                )
             return bool(is_supported.value)
         except Exception as exception:
-            _logger.error("Could not get if data rate was supported; " + str(exception))
+            _logger.error(
+                "Could not get if data rate was supported; " + str(exception)
+            )
             raise exception
 
     def get_is_taps_supported(self, tap):
@@ -663,12 +1126,20 @@ class TLCamera(object):
         try:
             c_value = c_int(tap)
             is_supported = c_bool()
-            error_code = self._sdk.tl_camera_get_is_taps_supported(self._camera, c_value, is_supported)
+            error_code = self._sdk.tl_camera_get_is_taps_supported(
+                self._camera, c_value, is_supported
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "get_is_taps_supported", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "get_is_taps_supported", error_code
+                    )
+                )
             return bool(is_supported.value)
         except Exception as exception:
-            _logger.error("Could not get if tap was supported; " + str(exception))
+            _logger.error(
+                "Could not get if tap was supported; " + str(exception)
+            )
             raise exception
 
     def get_is_operation_mode_supported(self, operation_mode):
@@ -684,12 +1155,23 @@ class TLCamera(object):
         try:
             c_value = c_int(operation_mode)
             is_supported = c_bool()
-            error_code = self._sdk.tl_camera_get_is_operation_mode_supported(self._camera, c_value, is_supported)
+            error_code = self._sdk.tl_camera_get_is_operation_mode_supported(
+                self._camera, c_value, is_supported
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "get_is_operation_mode_supported", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "get_is_operation_mode_supported",
+                        error_code,
+                    )
+                )
             return bool(is_supported.value)
         except Exception as exception:
-            _logger.error("Could not get if operation mode was supported; " + str(exception))
+            _logger.error(
+                "Could not get if operation mode was supported; "
+                + str(exception)
+            )
             raise exception
 
     def get_color_correction_matrix(self):
@@ -704,21 +1186,33 @@ class TLCamera(object):
         """
         try:
             color_correction_matrix = _3x3Matrix_float()
-            error_code = self._sdk.tl_camera_get_color_correction_matrix(self._camera, color_correction_matrix)
+            error_code = self._sdk.tl_camera_get_color_correction_matrix(
+                self._camera, color_correction_matrix
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "get_color_correction_matrix", error_code))
-            color_correction_matrix_as_np_array = np.array([float(color_correction_matrix[0]),
-                                                            float(color_correction_matrix[1]),
-                                                            float(color_correction_matrix[2]),
-                                                            float(color_correction_matrix[3]),
-                                                            float(color_correction_matrix[4]),
-                                                            float(color_correction_matrix[5]),
-                                                            float(color_correction_matrix[6]),
-                                                            float(color_correction_matrix[7]),
-                                                            float(color_correction_matrix[8])])
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "get_color_correction_matrix", error_code
+                    )
+                )
+            color_correction_matrix_as_np_array = np.array(
+                [
+                    float(color_correction_matrix[0]),
+                    float(color_correction_matrix[1]),
+                    float(color_correction_matrix[2]),
+                    float(color_correction_matrix[3]),
+                    float(color_correction_matrix[4]),
+                    float(color_correction_matrix[5]),
+                    float(color_correction_matrix[6]),
+                    float(color_correction_matrix[7]),
+                    float(color_correction_matrix[8]),
+                ]
+            )
             return color_correction_matrix_as_np_array
         except Exception as exception:
-            _logger.error("Could not get color correction matrix; " + str(exception))
+            _logger.error(
+                "Could not get color correction matrix; " + str(exception)
+            )
             raise exception
 
     def _get_time_stamp_clock_frequency_or_null(self):
@@ -733,14 +1227,18 @@ class TLCamera(object):
         """
         try:
             time_stamp_clock_frequency = c_int()
-            error_code = self._sdk.tl_camera_get_timestamp_clock_frequency(self._camera, time_stamp_clock_frequency)
+            error_code = self._sdk.tl_camera_get_timestamp_clock_frequency(
+                self._camera, time_stamp_clock_frequency
+            )
             if error_code != 0:
                 return None
             if time_stamp_clock_frequency.value == 0:
                 return None
             return int(time_stamp_clock_frequency.value)
         except Exception as exception:
-            _logger.debug("Could not get time stamp clock frequency; " + str(exception))
+            _logger.debug(
+                "Could not get time stamp clock frequency; " + str(exception)
+            )
             return None
 
     def get_default_white_balance_matrix(self):
@@ -755,22 +1253,35 @@ class TLCamera(object):
         """
         try:
             white_balance_matrix = _3x3Matrix_float()
-            error_code = self._sdk.tl_camera_get_default_white_balance_matrix(self._camera, white_balance_matrix)
+            error_code = self._sdk.tl_camera_get_default_white_balance_matrix(
+                self._camera, white_balance_matrix
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "get_default_white_balance_matrix",
-                                                              error_code))
-            white_balance_matrix_as_np_array = np.array([float(white_balance_matrix[0]),
-                                                         float(white_balance_matrix[1]),
-                                                         float(white_balance_matrix[2]),
-                                                         float(white_balance_matrix[3]),
-                                                         float(white_balance_matrix[4]),
-                                                         float(white_balance_matrix[5]),
-                                                         float(white_balance_matrix[6]),
-                                                         float(white_balance_matrix[7]),
-                                                         float(white_balance_matrix[8])])
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "get_default_white_balance_matrix",
+                        error_code,
+                    )
+                )
+            white_balance_matrix_as_np_array = np.array(
+                [
+                    float(white_balance_matrix[0]),
+                    float(white_balance_matrix[1]),
+                    float(white_balance_matrix[2]),
+                    float(white_balance_matrix[3]),
+                    float(white_balance_matrix[4]),
+                    float(white_balance_matrix[5]),
+                    float(white_balance_matrix[6]),
+                    float(white_balance_matrix[7]),
+                    float(white_balance_matrix[8]),
+                ]
+            )
             return white_balance_matrix_as_np_array
         except Exception as exception:
-            _logger.error("Could not get default white balance matrix; " + str(exception))
+            _logger.error(
+                "Could not get default white balance matrix; " + str(exception)
+            )
             raise exception
 
     def arm(self, frames_to_buffer):
@@ -796,12 +1307,20 @@ class TLCamera(object):
 
         """
         try:
-            error_code = self._sdk.tl_camera_arm(self._camera, c_int(frames_to_buffer))
+            error_code = self._sdk.tl_camera_arm(
+                self._camera, c_int(frames_to_buffer)
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_arm", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_arm", error_code
+                    )
+                )
             self._local_image_height_pixels = self.image_height_pixels
             self._local_image_width_pixels = self.image_width_pixels
-            self._local_timestamp_clock_frequency = self._get_time_stamp_clock_frequency_or_null()
+            self._local_timestamp_clock_frequency = (
+                self._get_time_stamp_clock_frequency_or_null()
+            )
         except Exception as exception:
             _logger.error("Could not arm camera; " + str(exception))
             raise exception
@@ -827,12 +1346,21 @@ class TLCamera(object):
 
         """
         try:
-            error_code = self._sdk.tl_camera_issue_software_trigger(self._camera)
+            error_code = self._sdk.tl_camera_issue_software_trigger(
+                self._camera
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_issue_software_trigger",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_issue_software_trigger",
+                        error_code,
+                    )
+                )
         except Exception as exception:
-            _logger.error("Could not issue software trigger; " + str(exception))
+            _logger.error(
+                "Could not issue software trigger; " + str(exception)
+            )
             raise exception
 
     def disarm(self):
@@ -849,7 +1377,11 @@ class TLCamera(object):
         try:
             error_code = self._sdk.tl_camera_disarm(self._camera)
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_disarm", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_disarm", error_code
+                    )
+                )
         except Exception as exception:
             _logger.error("Could not disarm camera; " + str(exception))
             raise exception
@@ -866,13 +1398,22 @@ class TLCamera(object):
         try:
             c_decibels = c_double()
             c_gain = c_int(gain)
-            error_code = self._sdk.tl_camera_convert_gain_to_decibels(self._camera, c_gain, c_decibels)
+            error_code = self._sdk.tl_camera_convert_gain_to_decibels(
+                self._camera, c_gain, c_decibels
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_convert_gain_to_decibels",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_convert_gain_to_decibels",
+                        error_code,
+                    )
+                )
             return float(c_decibels.value)
         except Exception as exception:
-            _logger.error("Could not convert gain to decibels; " + str(exception))
+            _logger.error(
+                "Could not convert gain to decibels; " + str(exception)
+            )
             raise exception
 
     def convert_decibels_to_gain(self, gain_db):
@@ -888,28 +1429,52 @@ class TLCamera(object):
         try:
             c_gain = c_int()
             c_decibels = c_double(gain_db)
-            error_code = self._sdk.tl_camera_convert_decibels_to_gain(self._camera, c_decibels, c_gain)
+            error_code = self._sdk.tl_camera_convert_decibels_to_gain(
+                self._camera, c_decibels, c_gain
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_convert_decibels_to_gain",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_convert_decibels_to_gain",
+                        error_code,
+                    )
+                )
             return int(c_gain.value)
         except Exception as exception:
-            _logger.error("Could not convert decibel gain to gain index; " + str(exception))
+            _logger.error(
+                "Could not convert decibel gain to gain index; "
+                + str(exception)
+            )
             raise exception
 
     # internal command intended for TSI software developers
     def _internal_command(self, command):
         # type: (str) -> str
         try:
-            command_data = create_string_buffer(str(command).encode('utf-8') + b'\0', len(command) + 1)
+            command_data = create_string_buffer(
+                str(command).encode("utf-8") + b"\0", len(command) + 1
+            )
             response_data = create_string_buffer(_STRING_MAX)
             # noinspection PyProtectedMember
-            error_code = self._sdk._internal_command(self._camera, command_data, len(command) + 1, response_data, _STRING_MAX)
+            error_code = self._sdk._internal_command(
+                self._camera,
+                command_data,
+                len(command) + 1,
+                response_data,
+                _STRING_MAX,
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "_internal_command", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "_internal_command", error_code
+                    )
+                )
             return str(response_data.value.decode("utf-8"))
         except Exception as exception:
-            _logger.error("Unable to execute internal command; " + str(exception))
+            _logger.error(
+                "Unable to execute internal command; " + str(exception)
+            )
             raise exception
 
     """ Properties """
@@ -928,9 +1493,15 @@ class TLCamera(object):
         """
         try:
             exposure_time_us = c_longlong()
-            error_code = self._sdk.tl_camera_get_exposure_time(self._camera, exposure_time_us)
+            error_code = self._sdk.tl_camera_get_exposure_time(
+                self._camera, exposure_time_us
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_exposure_time", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_exposure_time", error_code
+                    )
+                )
             return int(exposure_time_us.value)
         except Exception as exception:
             _logger.error("Could not get exposure time; " + str(exception))
@@ -940,9 +1511,15 @@ class TLCamera(object):
     def exposure_time_us(self, exposure_time_us):
         try:
             c_value = c_longlong(exposure_time_us)
-            error_code = self._sdk.tl_camera_set_exposure_time(self._camera, c_value)
+            error_code = self._sdk.tl_camera_set_exposure_time(
+                self._camera, c_value
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_exposure_time", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_set_exposure_time", error_code
+                    )
+                )
         except Exception as exception:
             _logger.error("Could not set exposure time; " + str(exception))
             raise exception
@@ -958,25 +1535,43 @@ class TLCamera(object):
         """
         try:
             image_poll_timeout_ms = c_int()
-            error_code = self._sdk.tl_camera_get_image_poll_timeout(self._camera, image_poll_timeout_ms)
+            error_code = self._sdk.tl_camera_get_image_poll_timeout(
+                self._camera, image_poll_timeout_ms
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_image_poll_timeout",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_image_poll_timeout",
+                        error_code,
+                    )
+                )
             return int(image_poll_timeout_ms.value)
         except Exception as exception:
-            _logger.error("Could not get image poll timeout; " + str(exception))
+            _logger.error(
+                "Could not get image poll timeout; " + str(exception)
+            )
             raise exception
 
     @image_poll_timeout_ms.setter
     def image_poll_timeout_ms(self, timeout_ms):
         try:
             c_value = c_int(timeout_ms)
-            error_code = self._sdk.tl_camera_set_image_poll_timeout(self._camera, c_value)
+            error_code = self._sdk.tl_camera_set_image_poll_timeout(
+                self._camera, c_value
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_image_poll_timeout",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_set_image_poll_timeout",
+                        error_code,
+                    )
+                )
         except Exception as exception:
-            _logger.error("Could not set image poll timeout; " + str(exception))
+            _logger.error(
+                "Could not set image poll timeout; " + str(exception)
+            )
             raise exception
 
     @property
@@ -989,15 +1584,25 @@ class TLCamera(object):
         try:
             exposure_time_us_min = c_longlong()
             exposure_time_us_max = c_longlong()
-            error_code = self._sdk.tl_camera_get_exposure_time_range(self._camera,
-                                                                     exposure_time_us_min,
-                                                                     exposure_time_us_max)
+            error_code = self._sdk.tl_camera_get_exposure_time_range(
+                self._camera, exposure_time_us_min, exposure_time_us_max
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_exposure_time_range",
-                                                              error_code))
-            return Range(int(exposure_time_us_min.value), int(exposure_time_us_max.value))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_exposure_time_range",
+                        error_code,
+                    )
+                )
+            return Range(
+                int(exposure_time_us_min.value),
+                int(exposure_time_us_max.value),
+            )
         except Exception as exception:
-            _logger.error("Could not get exposure time range; " + str(exception))
+            _logger.error(
+                "Could not get exposure time range; " + str(exception)
+            )
             raise exception
 
     @property
@@ -1009,9 +1614,15 @@ class TLCamera(object):
         """
         try:
             firmware_version = create_string_buffer(_STRING_MAX)
-            error_code = self._sdk.tl_camera_get_firmware_version(self._camera, firmware_version, _STRING_MAX)
+            error_code = self._sdk.tl_camera_get_firmware_version(
+                self._camera, firmware_version, _STRING_MAX
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_firmware_version", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_firmware_version", error_code
+                    )
+                )
             return str(firmware_version.value.decode("utf-8"))
         except Exception as exception:
             _logger.error("Could not get firmware version; " + str(exception))
@@ -1032,9 +1643,15 @@ class TLCamera(object):
         """
         try:
             frame_time_us = c_int()
-            error_code = self._sdk.tl_camera_get_frame_time(self._camera, frame_time_us)
+            error_code = self._sdk.tl_camera_get_frame_time(
+                self._camera, frame_time_us
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_frame_time", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_frame_time", error_code
+                    )
+                )
             return int(frame_time_us.value)
         except Exception as exception:
             _logger.error("Could not get frame time; " + str(exception))
@@ -1052,9 +1669,15 @@ class TLCamera(object):
         """
         try:
             trigger_polarity = c_int()
-            error_code = self._sdk.tl_camera_get_trigger_polarity(self._camera, trigger_polarity)
+            error_code = self._sdk.tl_camera_get_trigger_polarity(
+                self._camera, trigger_polarity
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_trigger_polarity", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_trigger_polarity", error_code
+                    )
+                )
             return TRIGGER_POLARITY(int(trigger_polarity.value))
         except Exception as exception:
             _logger.error("Could not get trigger polarity; " + str(exception))
@@ -1064,9 +1687,15 @@ class TLCamera(object):
     def trigger_polarity(self, trigger_polarity_enum):
         try:
             c_value = c_int(int(trigger_polarity_enum))
-            error_code = self._sdk.tl_camera_set_trigger_polarity(self._camera, c_value)
+            error_code = self._sdk.tl_camera_set_trigger_polarity(
+                self._camera, c_value
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_trigger_polarity", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_set_trigger_polarity", error_code
+                    )
+                )
         except Exception as exception:
             _logger.error("Could not set trigger polarity; " + str(exception))
             raise exception
@@ -1082,7 +1711,11 @@ class TLCamera(object):
             binx = c_int()
             error_code = self._sdk.tl_camera_get_binx(self._camera, binx)
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_binx", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_binx", error_code
+                    )
+                )
             return int(binx.value)
         except Exception as exception:
             _logger.error("Could not get bin x; " + str(exception))
@@ -1094,7 +1727,11 @@ class TLCamera(object):
             c_value = c_int(binx)
             error_code = self._sdk.tl_camera_set_binx(self._camera, c_value)
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_binx", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_set_binx", error_code
+                    )
+                )
         except Exception as exception:
             _logger.error("Could not set bin x; " + str(exception))
             raise exception
@@ -1108,13 +1745,22 @@ class TLCamera(object):
         """
         try:
             sensor_readout_time_ns = c_int()
-            error_code = self._sdk.tl_camera_get_sensor_readout_time(self._camera, sensor_readout_time_ns)
+            error_code = self._sdk.tl_camera_get_sensor_readout_time(
+                self._camera, sensor_readout_time_ns
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_sensor_readout_time",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_sensor_readout_time",
+                        error_code,
+                    )
+                )
             return int(sensor_readout_time_ns.value)
         except Exception as exception:
-            _logger.error("Could not get sensor readout time; " + str(exception))
+            _logger.error(
+                "Could not get sensor readout time; " + str(exception)
+            )
             raise exception
 
     @property
@@ -1129,9 +1775,15 @@ class TLCamera(object):
         try:
             hbin_min = c_int()
             hbin_max = c_int()
-            error_code = self._sdk.tl_camera_get_binx_range(self._camera, hbin_min, hbin_max)
+            error_code = self._sdk.tl_camera_get_binx_range(
+                self._camera, hbin_min, hbin_max
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_binx_range", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_binx_range", error_code
+                    )
+                )
             return Range(int(hbin_min.value), int(hbin_max.value))
         except Exception as exception:
             _logger.error("Could not get bin x range; " + str(exception))
@@ -1151,28 +1803,49 @@ class TLCamera(object):
         """
         try:
             is_hot_pixel_correction_enabled = c_int()
-            error_code = self._sdk.tl_camera_get_is_hot_pixel_correction_enabled(self._camera,
-                                                                                 is_hot_pixel_correction_enabled)
+            error_code = (
+                self._sdk.tl_camera_get_is_hot_pixel_correction_enabled(
+                    self._camera, is_hot_pixel_correction_enabled
+                )
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk,
-                                                              "tl_camera_get_is_hot_pixel_correction_enabled",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_is_hot_pixel_correction_enabled",
+                        error_code,
+                    )
+                )
             return bool(is_hot_pixel_correction_enabled.value)
         except Exception as exception:
-            _logger.error("Could not get is hot pixel correction enabled; " + str(exception))
+            _logger.error(
+                "Could not get is hot pixel correction enabled; "
+                + str(exception)
+            )
             raise exception
 
     @is_hot_pixel_correction_enabled.setter
     def is_hot_pixel_correction_enabled(self, is_hot_pixel_correction_enabled):
         try:
             c_value = c_int(is_hot_pixel_correction_enabled)
-            error_code = self._sdk.tl_camera_set_is_hot_pixel_correction_enabled(self._camera, c_value)
+            error_code = (
+                self._sdk.tl_camera_set_is_hot_pixel_correction_enabled(
+                    self._camera, c_value
+                )
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk,
-                                                              "tl_camera_set_is_hot_pixel_correction_enabled",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_set_is_hot_pixel_correction_enabled",
+                        error_code,
+                    )
+                )
         except Exception as exception:
-            _logger.error("Could not set is hot pixel correction enabled; " + str(exception))
+            _logger.error(
+                "Could not set is hot pixel correction enabled; "
+                + str(exception)
+            )
             raise exception
 
     @property
@@ -1193,26 +1866,49 @@ class TLCamera(object):
         """
         try:
             hot_pixel_correction_threshold = c_int()
-            error_code = self._sdk.tl_camera_get_hot_pixel_correction_threshold(self._camera,
-                                                                                hot_pixel_correction_threshold)
+            error_code = (
+                self._sdk.tl_camera_get_hot_pixel_correction_threshold(
+                    self._camera, hot_pixel_correction_threshold
+                )
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_hot_pixel_correction_threshold",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_hot_pixel_correction_threshold",
+                        error_code,
+                    )
+                )
             return int(hot_pixel_correction_threshold.value)
         except Exception as exception:
-            _logger.error("Could not get hot pixel correction threshold; " + str(exception))
+            _logger.error(
+                "Could not get hot pixel correction threshold; "
+                + str(exception)
+            )
             raise exception
 
     @hot_pixel_correction_threshold.setter
     def hot_pixel_correction_threshold(self, hot_pixel_correction_threshold):
         try:
             c_value = c_int(hot_pixel_correction_threshold)
-            error_code = self._sdk.tl_camera_set_hot_pixel_correction_threshold(self._camera, c_value)
+            error_code = (
+                self._sdk.tl_camera_set_hot_pixel_correction_threshold(
+                    self._camera, c_value
+                )
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_hot_pixel_correction_threshold",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_set_hot_pixel_correction_threshold",
+                        error_code,
+                    )
+                )
         except Exception as exception:
-            _logger.error("Could not set hot pixel correction threshold; " + str(exception))
+            _logger.error(
+                "Could not set hot pixel correction threshold; "
+                + str(exception)
+            )
             raise exception
 
     @property
@@ -1226,17 +1922,30 @@ class TLCamera(object):
         try:
             hot_pixel_correction_threshold_min = c_int()
             hot_pixel_correction_threshold_max = c_int()
-            error_code = self._sdk.tl_camera_get_hot_pixel_correction_threshold_range(
-                self._camera,
-                hot_pixel_correction_threshold_min,
-                hot_pixel_correction_threshold_max)
+            error_code = (
+                self._sdk.tl_camera_get_hot_pixel_correction_threshold_range(
+                    self._camera,
+                    hot_pixel_correction_threshold_min,
+                    hot_pixel_correction_threshold_max,
+                )
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk,
-                                                              "tl_camera_get_hot_pixel_correction_threshold_range",
-                                                              error_code))
-            return Range(int(hot_pixel_correction_threshold_min.value), int(hot_pixel_correction_threshold_max.value))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_hot_pixel_correction_threshold_range",
+                        error_code,
+                    )
+                )
+            return Range(
+                int(hot_pixel_correction_threshold_min.value),
+                int(hot_pixel_correction_threshold_max.value),
+            )
         except Exception as exception:
-            _logger.error("Could not get hot pixel correction threshold range; " + str(exception))
+            _logger.error(
+                "Could not get hot pixel correction threshold range; "
+                + str(exception)
+            )
             raise exception
 
     @property
@@ -1249,9 +1958,15 @@ class TLCamera(object):
         """
         try:
             sensor_width_pixels = c_int()
-            error_code = self._sdk.tl_camera_get_sensor_width(self._camera, sensor_width_pixels)
+            error_code = self._sdk.tl_camera_get_sensor_width(
+                self._camera, sensor_width_pixels
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_sensor_width", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_sensor_width", error_code
+                    )
+                )
             return int(sensor_width_pixels.value)
         except Exception as exception:
             _logger.error("Could not get sensor width; " + str(exception))
@@ -1267,9 +1982,15 @@ class TLCamera(object):
         try:
             gain_min = c_int()
             gain_max = c_int()
-            error_code = self._sdk.tl_camera_get_gain_range(self._camera, gain_min, gain_max)
+            error_code = self._sdk.tl_camera_get_gain_range(
+                self._camera, gain_min, gain_max
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_gain_range", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_gain_range", error_code
+                    )
+                )
             return Range(int(gain_min.value), int(gain_max.value))
         except Exception as exception:
             _logger.error("Could not get gain range; " + str(exception))
@@ -1285,12 +2006,21 @@ class TLCamera(object):
         try:
             image_width_pixels_min = c_int()
             image_width_pixels_max = c_int()
-            error_code = self._sdk.tl_camera_get_image_width_range(self._camera,
-                                                                   image_width_pixels_min,
-                                                                   image_width_pixels_max)
+            error_code = self._sdk.tl_camera_get_image_width_range(
+                self._camera, image_width_pixels_min, image_width_pixels_max
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_image_width_range", error_code))
-            return Range(int(image_width_pixels_min.value), int(image_width_pixels_max.value))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_image_width_range",
+                        error_code,
+                    )
+                )
+            return Range(
+                int(image_width_pixels_min.value),
+                int(image_width_pixels_max.value),
+            )
         except Exception as exception:
             _logger.error("Could not get image width range; " + str(exception))
             raise exception
@@ -1305,9 +2035,15 @@ class TLCamera(object):
         """
         try:
             sensor_height_pixels = c_int()
-            error_code = self._sdk.tl_camera_get_sensor_height(self._camera, sensor_height_pixels)
+            error_code = self._sdk.tl_camera_get_sensor_height(
+                self._camera, sensor_height_pixels
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_sensor_height", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_sensor_height", error_code
+                    )
+                )
             return int(sensor_height_pixels.value)
         except Exception as exception:
             _logger.error("Could not get sensor height; " + str(exception))
@@ -1323,15 +2059,25 @@ class TLCamera(object):
         try:
             image_height_pixels_min = c_int()
             image_height_pixels_max = c_int()
-            error_code = self._sdk.tl_camera_get_image_height_range(self._camera,
-                                                                    image_height_pixels_min,
-                                                                    image_height_pixels_max)
+            error_code = self._sdk.tl_camera_get_image_height_range(
+                self._camera, image_height_pixels_min, image_height_pixels_max
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_image_height_range",
-                                                              error_code))
-            return Range(int(image_height_pixels_min.value), int(image_height_pixels_max.value))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_image_height_range",
+                        error_code,
+                    )
+                )
+            return Range(
+                int(image_height_pixels_min.value),
+                int(image_height_pixels_max.value),
+            )
         except Exception as exception:
-            _logger.error("Could not get image height range; " + str(exception))
+            _logger.error(
+                "Could not get image height range; " + str(exception)
+            )
             raise exception
 
     @property
@@ -1343,9 +2089,15 @@ class TLCamera(object):
         """
         try:
             model = create_string_buffer(_STRING_MAX)
-            error_code = self._sdk.tl_camera_get_model(self._camera, model, c_int(_STRING_MAX))
+            error_code = self._sdk.tl_camera_get_model(
+                self._camera, model, c_int(_STRING_MAX)
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_model", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_model", error_code
+                    )
+                )
             return str(model.value.decode("utf-8"))
         except Exception as exception:
             _logger.error("Could not get camera model; " + str(exception))
@@ -1362,9 +2114,15 @@ class TLCamera(object):
         """
         try:
             name = create_string_buffer(_STRING_MAX)
-            error_code = self._sdk.tl_camera_get_name(self._camera, name, c_int(_STRING_MAX))
+            error_code = self._sdk.tl_camera_get_name(
+                self._camera, name, c_int(_STRING_MAX)
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_name", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_name", error_code
+                    )
+                )
             return str(name.value.decode("utf-8"))
         except Exception as exception:
             _logger.error("Could not get camera name; " + str(exception))
@@ -1373,10 +2131,16 @@ class TLCamera(object):
     @name.setter
     def name(self, name):
         try:
-            c_value = create_string_buffer(str(name).encode('utf-8') + b'\0', len(name) + 1)
+            c_value = create_string_buffer(
+                str(name).encode("utf-8") + b"\0", len(name) + 1
+            )
             error_code = self._sdk.tl_camera_set_name(self._camera, c_value)
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_name", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_set_name", error_code
+                    )
+                )
         except Exception as exception:
             _logger.error("Could not set camera name; " + str(exception))
             raise exception
@@ -1391,15 +2155,25 @@ class TLCamera(object):
         try:
             name_string_length_min = c_int()
             name_string_length_max = c_int()
-            error_code = self._sdk.tl_camera_get_name_string_length_range(self._camera,
-                                                                          name_string_length_min,
-                                                                          name_string_length_max)
+            error_code = self._sdk.tl_camera_get_name_string_length_range(
+                self._camera, name_string_length_min, name_string_length_max
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_name_string_length_range",
-                                                              error_code))
-            return Range(int(name_string_length_min.value), int(name_string_length_max.value))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_name_string_length_range",
+                        error_code,
+                    )
+                )
+            return Range(
+                int(name_string_length_min.value),
+                int(name_string_length_max.value),
+            )
         except Exception as exception:
-            _logger.error("Could not get name string length range; " + str(exception))
+            _logger.error(
+                "Could not get name string length range; " + str(exception)
+            )
             raise exception
 
     @property
@@ -1414,28 +2188,52 @@ class TLCamera(object):
         """
         try:
             number_of_frames_per_trigger_or_zero_for_unlimited = c_uint()
-            error_code = self._sdk.tl_camera_get_frames_per_trigger_zero_for_unlimited(
-                self._camera, number_of_frames_per_trigger_or_zero_for_unlimited)
+            error_code = (
+                self._sdk.tl_camera_get_frames_per_trigger_zero_for_unlimited(
+                    self._camera,
+                    number_of_frames_per_trigger_or_zero_for_unlimited,
+                )
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk,
-                                                              "tl_camera_get_frames_per_trigger_zero_for_unlimited",
-                                                              error_code))
-            return int(number_of_frames_per_trigger_or_zero_for_unlimited.value)
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_frames_per_trigger_zero_for_unlimited",
+                        error_code,
+                    )
+                )
+            return int(
+                number_of_frames_per_trigger_or_zero_for_unlimited.value
+            )
         except Exception as exception:
-            _logger.error("Could not get frames per trigger; " + str(exception))
+            _logger.error(
+                "Could not get frames per trigger; " + str(exception)
+            )
             raise exception
 
     @frames_per_trigger_zero_for_unlimited.setter
-    def frames_per_trigger_zero_for_unlimited(self, number_of_frames_per_trigger_zero_for_unlimited):
+    def frames_per_trigger_zero_for_unlimited(
+        self, number_of_frames_per_trigger_zero_for_unlimited
+    ):
         try:
             c_value = c_uint(number_of_frames_per_trigger_zero_for_unlimited)
-            error_code = self._sdk.tl_camera_set_frames_per_trigger_zero_for_unlimited(self._camera, c_value)
+            error_code = (
+                self._sdk.tl_camera_set_frames_per_trigger_zero_for_unlimited(
+                    self._camera, c_value
+                )
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk,
-                                                              "tl_camera_set_frames_per_trigger_zero_for_unlimited",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_set_frames_per_trigger_zero_for_unlimited",
+                        error_code,
+                    )
+                )
         except Exception as exception:
-            _logger.error("Could not set number of frames per trigger; " + str(exception))
+            _logger.error(
+                "Could not set number of frames per trigger; " + str(exception)
+            )
             raise exception
 
     @property
@@ -1454,15 +2252,27 @@ class TLCamera(object):
         try:
             number_of_frames_per_trigger_min = c_uint()
             number_of_frames_per_trigger_max = c_uint()
-            error_code = self._sdk.tl_camera_get_frames_per_trigger_range(self._camera,
-                                                                          number_of_frames_per_trigger_min,
-                                                                          number_of_frames_per_trigger_max)
+            error_code = self._sdk.tl_camera_get_frames_per_trigger_range(
+                self._camera,
+                number_of_frames_per_trigger_min,
+                number_of_frames_per_trigger_max,
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_frames_per_trigger_range",
-                                                              error_code))
-            return Range(int(number_of_frames_per_trigger_min.value), int(number_of_frames_per_trigger_max.value))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_frames_per_trigger_range",
+                        error_code,
+                    )
+                )
+            return Range(
+                int(number_of_frames_per_trigger_min.value),
+                int(number_of_frames_per_trigger_max.value),
+            )
         except Exception as exception:
-            _logger.error("Could not get frames per trigger range; " + str(exception))
+            _logger.error(
+                "Could not get frames per trigger range; " + str(exception)
+            )
             raise exception
 
     #    @property
@@ -1489,9 +2299,15 @@ class TLCamera(object):
         """
         try:
             usb_port_type = c_int()
-            error_code = self._sdk.tl_camera_get_usb_port_type(self._camera, usb_port_type)
+            error_code = self._sdk.tl_camera_get_usb_port_type(
+                self._camera, usb_port_type
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_usb_port_type", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_usb_port_type", error_code
+                    )
+                )
             return USB_PORT_TYPE(usb_port_type.value)
         except Exception as exception:
             _logger.error("Could not get usb port type; " + str(exception))
@@ -1507,13 +2323,22 @@ class TLCamera(object):
         """
         try:
             communication_interface = c_int()
-            error_code = self._sdk.tl_camera_get_communication_interface(self._camera, communication_interface)
+            error_code = self._sdk.tl_camera_get_communication_interface(
+                self._camera, communication_interface
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_communication_interface",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_communication_interface",
+                        error_code,
+                    )
+                )
             return COMMUNICATION_INTERFACE(communication_interface.value)
         except Exception as exception:
-            _logger.error("Could not get communication interface; " + str(exception))
+            _logger.error(
+                "Could not get communication interface; " + str(exception)
+            )
             raise exception
 
     @property
@@ -1536,9 +2361,15 @@ class TLCamera(object):
         """
         try:
             operation_mode = c_int()
-            error_code = self._sdk.tl_camera_get_operation_mode(self._camera, operation_mode)
+            error_code = self._sdk.tl_camera_get_operation_mode(
+                self._camera, operation_mode
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_operation_mode", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_operation_mode", error_code
+                    )
+                )
             return OPERATION_MODE(operation_mode.value)
         except Exception as exception:
             _logger.error("Could not get operation mode; " + str(exception))
@@ -1548,9 +2379,15 @@ class TLCamera(object):
     def operation_mode(self, operation_mode):
         try:
             c_value = c_int(operation_mode)
-            error_code = self._sdk.tl_camera_set_operation_mode(self._camera, c_value)
+            error_code = self._sdk.tl_camera_set_operation_mode(
+                self._camera, c_value
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_operation_mode", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_set_operation_mode", error_code
+                    )
+                )
         except Exception as exception:
             _logger.error("Could not set operation mode; " + str(exception))
             raise exception
@@ -1566,9 +2403,15 @@ class TLCamera(object):
         """
         try:
             is_armed = c_bool()
-            error_code = self._sdk.tl_camera_get_is_armed(self._camera, is_armed)
+            error_code = self._sdk.tl_camera_get_is_armed(
+                self._camera, is_armed
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_is_armed", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_is_armed", error_code
+                    )
+                )
             return bool(is_armed.value)
         except Exception as exception:
             _logger.error("Could not get is armed; " + str(exception))
@@ -1589,9 +2432,15 @@ class TLCamera(object):
         """
         try:
             is_eep_supported = c_bool()
-            error_code = self._sdk.tl_camera_get_is_eep_supported(self._camera, is_eep_supported)
+            error_code = self._sdk.tl_camera_get_is_eep_supported(
+                self._camera, is_eep_supported
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_is_eep_supported", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_is_eep_supported", error_code
+                    )
+                )
             return bool(is_eep_supported.value)
         except Exception as exception:
             _logger.error("Could not get is eep supported; " + str(exception))
@@ -1608,9 +2457,15 @@ class TLCamera(object):
         """
         try:
             is_led_supported = c_bool()
-            error_code = self._sdk.tl_camera_get_is_led_supported(self._camera, is_led_supported)
+            error_code = self._sdk.tl_camera_get_is_led_supported(
+                self._camera, is_led_supported
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_is_led_supported", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_is_led_supported", error_code
+                    )
+                )
             return bool(is_led_supported.value)
         except Exception as exception:
             _logger.error("Could not get is led supported; " + str(exception))
@@ -1628,13 +2483,22 @@ class TLCamera(object):
         """
         try:
             is_cooling_supported = c_bool()
-            error_code = self._sdk.tl_camera_get_is_cooling_supported(self._camera, is_cooling_supported)
+            error_code = self._sdk.tl_camera_get_is_cooling_supported(
+                self._camera, is_cooling_supported
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_is_cooling_supported",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_is_cooling_supported",
+                        error_code,
+                    )
+                )
             return bool(is_cooling_supported.value)
         except Exception as exception:
-            _logger.error("Could not get is cooling supported; " + str(exception))
+            _logger.error(
+                "Could not get is cooling supported; " + str(exception)
+            )
             raise exception
 
     @property
@@ -1652,10 +2516,17 @@ class TLCamera(object):
         """
         try:
             is_cooling_enabled = c_bool()
-            error_code = self._sdk.tl_camera_get_is_cooling_enabled(self._camera, is_cooling_enabled)
+            error_code = self._sdk.tl_camera_get_is_cooling_enabled(
+                self._camera, is_cooling_enabled
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_is_cooling_enabled",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_is_cooling_enabled",
+                        error_code,
+                    )
+                )
             return bool(is_cooling_enabled.value)
         except Exception as exception:
             _logger.error("Could not get cooling enable; " + str(exception))
@@ -1674,13 +2545,22 @@ class TLCamera(object):
         """
         try:
             is_nir_boost_supported = c_bool()
-            error_code = self._sdk.tl_camera_get_is_nir_boost_supported(self._camera, is_nir_boost_supported)
+            error_code = self._sdk.tl_camera_get_is_nir_boost_supported(
+                self._camera, is_nir_boost_supported
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_is_nir_boost_supported",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_is_nir_boost_supported",
+                        error_code,
+                    )
+                )
             return bool(is_nir_boost_supported.value)
         except Exception as exception:
-            _logger.error("Could not get is nir boost supported; " + str(exception))
+            _logger.error(
+                "Could not get is nir boost supported; " + str(exception)
+            )
             raise exception
 
     @property
@@ -1692,13 +2572,22 @@ class TLCamera(object):
         """
         try:
             camera_sensor_type = c_int()
-            error_code = self._sdk.tl_camera_get_camera_sensor_type(self._camera, camera_sensor_type)
+            error_code = self._sdk.tl_camera_get_camera_sensor_type(
+                self._camera, camera_sensor_type
+            )
             if error_code != 0:
                 raise TLCameraError(
-                    _create_c_failure_message(self._sdk, "tl_camera_get_camera_sensor_type", error_code))
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_camera_sensor_type",
+                        error_code,
+                    )
+                )
             return SENSOR_TYPE(camera_sensor_type.value)
         except Exception as exception:
-            _logger.error("Could not get camera sensor type; " + str(exception))
+            _logger.error(
+                "Could not get camera sensor type; " + str(exception)
+            )
             raise exception
 
     @property
@@ -1711,13 +2600,22 @@ class TLCamera(object):
         """
         try:
             color_filter_array_phase = c_int()
-            error_code = self._sdk.tl_camera_get_color_filter_array_phase(self._camera, color_filter_array_phase)
+            error_code = self._sdk.tl_camera_get_color_filter_array_phase(
+                self._camera, color_filter_array_phase
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_color_filter_array_phase",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_color_filter_array_phase",
+                        error_code,
+                    )
+                )
             return FILTER_ARRAY_PHASE(color_filter_array_phase.value)
         except Exception as exception:
-            _logger.error("Could not get color filter array phase; " + str(exception))
+            _logger.error(
+                "Could not get color filter array phase; " + str(exception)
+            )
             raise exception
 
     @property
@@ -1728,16 +2626,30 @@ class TLCamera(object):
         :type: str
         """
         try:
-            color_correction_matrix_output_color_space = create_string_buffer(_STRING_MAX)
+            color_correction_matrix_output_color_space = create_string_buffer(
+                _STRING_MAX
+            )
             error_code = self._sdk.tl_camera_get_camera_color_correction_matrix_output_color_space(
-                self._camera,
-                color_correction_matrix_output_color_space)
+                self._camera, color_correction_matrix_output_color_space
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(
-                    self._sdk, "tl_camera_get_camera_color_correction_matrix_output_color_space", error_code))
-            return str(color_correction_matrix_output_color_space.value.decode('utf-8'))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_camera_color_correction_matrix_output_color_space",
+                        error_code,
+                    )
+                )
+            return str(
+                color_correction_matrix_output_color_space.value.decode(
+                    "utf-8"
+                )
+            )
         except Exception as exception:
-            _logger.error("Could not get camera color correction matrix output color space; " + str(exception))
+            _logger.error(
+                "Could not get camera color correction matrix output color space; "
+                + str(exception)
+            )
             raise exception
 
     @property
@@ -1754,9 +2666,15 @@ class TLCamera(object):
         """
         try:
             data_rate = c_int()
-            error_code = self._sdk.tl_camera_get_data_rate(self._camera, data_rate)
+            error_code = self._sdk.tl_camera_get_data_rate(
+                self._camera, data_rate
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_data_rate", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_data_rate", error_code
+                    )
+                )
             return DATA_RATE(data_rate.value)
         except Exception as exception:
             _logger.error("Could not get data rate; " + str(exception))
@@ -1766,9 +2684,15 @@ class TLCamera(object):
     def data_rate(self, data_rate):
         try:
             c_value = c_int(data_rate)
-            error_code = self._sdk.tl_camera_set_data_rate(self._camera, c_value)
+            error_code = self._sdk.tl_camera_set_data_rate(
+                self._camera, c_value
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_data_rate", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_set_data_rate", error_code
+                    )
+                )
         except Exception as exception:
             _logger.error("Could not set data rate; " + str(exception))
             raise exception
@@ -1783,13 +2707,22 @@ class TLCamera(object):
         """
         try:
             sensor_pixel_size_bytes = c_int()
-            error_code = self._sdk.tl_camera_get_sensor_pixel_size_bytes(self._camera, sensor_pixel_size_bytes)
+            error_code = self._sdk.tl_camera_get_sensor_pixel_size_bytes(
+                self._camera, sensor_pixel_size_bytes
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_sensor_pixel_size_bytes",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_sensor_pixel_size_bytes",
+                        error_code,
+                    )
+                )
             return int(sensor_pixel_size_bytes.value)
         except Exception as exception:
-            _logger.error("Could not get sensor pixel size bytes; " + str(exception))
+            _logger.error(
+                "Could not get sensor pixel size bytes; " + str(exception)
+            )
             raise exception
 
     @property
@@ -1802,13 +2735,22 @@ class TLCamera(object):
         """
         try:
             sensor_pixel_width_um = c_double()
-            error_code = self._sdk.tl_camera_get_sensor_pixel_width(self._camera, sensor_pixel_width_um)
+            error_code = self._sdk.tl_camera_get_sensor_pixel_width(
+                self._camera, sensor_pixel_width_um
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_sensor_pixel_width",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_sensor_pixel_width",
+                        error_code,
+                    )
+                )
             return float(sensor_pixel_width_um.value)
         except Exception as exception:
-            _logger.error("Could not get sensor pixel width; " + str(exception))
+            _logger.error(
+                "Could not get sensor pixel width; " + str(exception)
+            )
             raise exception
 
     @property
@@ -1821,13 +2763,22 @@ class TLCamera(object):
         """
         try:
             sensor_pixel_height_um = c_double()
-            error_code = self._sdk.tl_camera_get_sensor_pixel_height(self._camera, sensor_pixel_height_um)
+            error_code = self._sdk.tl_camera_get_sensor_pixel_height(
+                self._camera, sensor_pixel_height_um
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_sensor_pixel_height",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_sensor_pixel_height",
+                        error_code,
+                    )
+                )
             return float(sensor_pixel_height_um.value)
         except Exception as exception:
-            _logger.error("Could not get sensor pixel height; " + str(exception))
+            _logger.error(
+                "Could not get sensor pixel height; " + str(exception)
+            )
             raise exception
 
     @property
@@ -1844,9 +2795,15 @@ class TLCamera(object):
         """
         try:
             pixel_bit_depth = c_int()
-            error_code = self._sdk.tl_camera_get_bit_depth(self._camera, pixel_bit_depth)
+            error_code = self._sdk.tl_camera_get_bit_depth(
+                self._camera, pixel_bit_depth
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_bit_depth", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_bit_depth", error_code
+                    )
+                )
             return int(pixel_bit_depth.value)
         except Exception as exception:
             _logger.error("Could not get bit depth; " + str(exception))
@@ -1875,13 +2832,25 @@ class TLCamera(object):
             upper_left_y_pixels = c_int()
             lower_right_x_pixels = c_int()
             lower_right_y_pixels = c_int()
-            error_code = self._sdk.tl_camera_get_roi(self._camera,
-                                                     upper_left_x_pixels, upper_left_y_pixels,
-                                                     lower_right_x_pixels, lower_right_y_pixels)
+            error_code = self._sdk.tl_camera_get_roi(
+                self._camera,
+                upper_left_x_pixels,
+                upper_left_y_pixels,
+                lower_right_x_pixels,
+                lower_right_y_pixels,
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_roi", error_code))
-            return ROI(int(upper_left_x_pixels.value), int(upper_left_y_pixels.value),
-                       int(lower_right_x_pixels.value), int(lower_right_y_pixels.value))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_roi", error_code
+                    )
+                )
+            return ROI(
+                int(upper_left_x_pixels.value),
+                int(upper_left_y_pixels.value),
+                int(lower_right_x_pixels.value),
+                int(lower_right_y_pixels.value),
+            )
         except Exception as exception:
             _logger.error("Could not get ROI; " + str(exception))
             raise exception
@@ -1892,21 +2861,36 @@ class TLCamera(object):
             # noinspection PyUnusedLocal
             error_code = 0
             try:
-                upper_left_x_pixels, upper_left_y_pixels, lower_right_x_pixels, lower_right_y_pixels = roi
+                (
+                    upper_left_x_pixels,
+                    upper_left_y_pixels,
+                    lower_right_x_pixels,
+                    lower_right_y_pixels,
+                ) = roi
                 c_value_upper_left_x = c_int(upper_left_x_pixels)
                 c_value_upper_left_y = c_int(upper_left_y_pixels)
                 c_value_lower_right_x = c_int(lower_right_x_pixels)
                 c_value_lower_right_y = c_int(lower_right_y_pixels)
-                error_code = self._sdk.tl_camera_set_roi(self._camera,
-                                                         c_value_upper_left_x, c_value_upper_left_y,
-                                                         c_value_lower_right_x, c_value_lower_right_y)
+                error_code = self._sdk.tl_camera_set_roi(
+                    self._camera,
+                    c_value_upper_left_x,
+                    c_value_upper_left_y,
+                    c_value_lower_right_x,
+                    c_value_lower_right_y,
+                )
             except ValueError as value_error:
-                _logger.error("To set ROI use an iterable with 4 integers:\n"
-                              "camera.roi = (upper_left_x_pixels, upper_left_y_pixels, "
-                              "lower_right_x_pixels, lower_right_y_pixels)\n")
+                _logger.error(
+                    "To set ROI use an iterable with 4 integers:\n"
+                    "camera.roi = (upper_left_x_pixels, upper_left_y_pixels, "
+                    "lower_right_x_pixels, lower_right_y_pixels)\n"
+                )
                 raise value_error
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_roi", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_set_roi", error_code
+                    )
+                )
         except Exception as exception:
             _logger.error("Could not set ROI; " + str(exception))
             raise exception
@@ -1932,17 +2916,33 @@ class TLCamera(object):
             upper_left_y_pixels_max = c_int()
             lower_right_x_pixels_max = c_int()
             lower_right_y_pixels_max = c_int()
-            error_code = self._sdk.tl_camera_get_roi_range(self._camera,
-                                                           upper_left_x_pixels_min, upper_left_y_pixels_min,
-                                                           lower_right_x_pixels_min, lower_right_y_pixels_min,
-                                                           upper_left_x_pixels_max, upper_left_y_pixels_max,
-                                                           lower_right_x_pixels_max, lower_right_y_pixels_max)
+            error_code = self._sdk.tl_camera_get_roi_range(
+                self._camera,
+                upper_left_x_pixels_min,
+                upper_left_y_pixels_min,
+                lower_right_x_pixels_min,
+                lower_right_y_pixels_min,
+                upper_left_x_pixels_max,
+                upper_left_y_pixels_max,
+                lower_right_x_pixels_max,
+                lower_right_y_pixels_max,
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_roi_range", error_code))
-            return ROIRange(int(upper_left_x_pixels_min.value), int(upper_left_y_pixels_min.value),
-                            int(lower_right_x_pixels_min.value), int(lower_right_y_pixels_min.value),
-                            int(upper_left_x_pixels_max.value), int(upper_left_y_pixels_max.value),
-                            int(lower_right_x_pixels_max.value), int(lower_right_y_pixels_max.value))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_roi_range", error_code
+                    )
+                )
+            return ROIRange(
+                int(upper_left_x_pixels_min.value),
+                int(upper_left_y_pixels_min.value),
+                int(lower_right_x_pixels_min.value),
+                int(lower_right_y_pixels_min.value),
+                int(upper_left_x_pixels_max.value),
+                int(upper_left_y_pixels_max.value),
+                int(lower_right_x_pixels_max.value),
+                int(lower_right_y_pixels_max.value),
+            )
         except Exception as exception:
             _logger.error("Could not get ROI range; " + str(exception))
             raise exception
@@ -1956,10 +2956,16 @@ class TLCamera(object):
         """
         try:
             serial_number = create_string_buffer(_STRING_MAX)
-            error_code = self._sdk.tl_camera_get_serial_number(self._camera, serial_number, _STRING_MAX)
+            error_code = self._sdk.tl_camera_get_serial_number(
+                self._camera, serial_number, _STRING_MAX
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_serial_number", error_code))
-            return str(serial_number.value.decode('utf-8'))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_serial_number", error_code
+                    )
+                )
+            return str(serial_number.value.decode("utf-8"))
         except Exception as exception:
             _logger.error("Could not get serial number; " + str(exception))
             raise exception
@@ -1974,15 +2980,30 @@ class TLCamera(object):
         try:
             serial_number_string_length_min = c_int()
             serial_number_string_length_max = c_int()
-            error_code = self._sdk.tl_camera_get_serial_number_string_length_range(self._camera,
-                                                                                   serial_number_string_length_min,
-                                                                                   serial_number_string_length_max)
+            error_code = (
+                self._sdk.tl_camera_get_serial_number_string_length_range(
+                    self._camera,
+                    serial_number_string_length_min,
+                    serial_number_string_length_max,
+                )
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(
-                    self._sdk, "tl_camera_get_serial_number_string_length_range", error_code))
-            return Range(int(serial_number_string_length_min.value), int(serial_number_string_length_max.value))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_serial_number_string_length_range",
+                        error_code,
+                    )
+                )
+            return Range(
+                int(serial_number_string_length_min.value),
+                int(serial_number_string_length_max.value),
+            )
         except Exception as exception:
-            _logger.error("Could not get serial number string length range; " + str(exception))
+            _logger.error(
+                "Could not get serial number string length range; "
+                + str(exception)
+            )
             raise exception
 
     @property
@@ -1995,9 +3016,15 @@ class TLCamera(object):
         """
         try:
             is_led_on = c_bool()
-            error_code = self._sdk.tl_camera_get_is_led_on(self._camera, is_led_on)
+            error_code = self._sdk.tl_camera_get_is_led_on(
+                self._camera, is_led_on
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_is_led_on", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_is_led_on", error_code
+                    )
+                )
             return bool(is_led_on.value)
         except Exception as exception:
             _logger.error("Could not get is led on; " + str(exception))
@@ -2007,9 +3034,15 @@ class TLCamera(object):
     def is_led_on(self, is_led_on):
         try:
             c_value = c_bool(is_led_on)
-            error_code = self._sdk.tl_camera_set_is_led_on(self._camera, c_value)
+            error_code = self._sdk.tl_camera_set_is_led_on(
+                self._camera, c_value
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_is_led_on", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_set_is_led_on", error_code
+                    )
+                )
         except Exception as exception:
             _logger.error("Could not set is led on; " + str(exception))
             raise exception
@@ -2032,9 +3065,15 @@ class TLCamera(object):
         """
         try:
             eep_status_enum = c_int()
-            error_code = self._sdk.tl_camera_get_eep_status(self._camera, eep_status_enum)
+            error_code = self._sdk.tl_camera_get_eep_status(
+                self._camera, eep_status_enum
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_eep_status", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_eep_status", error_code
+                    )
+                )
             return EEP_STATUS(eep_status_enum.value)
         except Exception as exception:
             _logger.error("Could not get eep status; " + str(exception))
@@ -2072,9 +3111,15 @@ class TLCamera(object):
     def is_eep_enabled(self, is_eep_enabled):
         try:
             c_value = c_int(is_eep_enabled)
-            error_code = self._sdk.tl_camera_set_is_eep_enabled(self._camera, c_value)
+            error_code = self._sdk.tl_camera_set_is_eep_enabled(
+                self._camera, c_value
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_is_eep_enabled", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_set_is_eep_enabled", error_code
+                    )
+                )
         except Exception as exception:
             _logger.error("Could not set is eep enabled; " + str(exception))
             raise exception
@@ -2090,7 +3135,11 @@ class TLCamera(object):
             biny = c_int()
             error_code = self._sdk.tl_camera_get_biny(self._camera, biny)
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_biny", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_biny", error_code
+                    )
+                )
             return int(biny.value)
         except Exception as exception:
             _logger.error("Could not get bin y; " + str(exception))
@@ -2102,7 +3151,11 @@ class TLCamera(object):
             c_value = c_int(biny)
             error_code = self._sdk.tl_camera_set_biny(self._camera, c_value)
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_biny", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_set_biny", error_code
+                    )
+                )
         except Exception as exception:
             _logger.error("Could not set bin y; " + str(exception))
             raise exception
@@ -2119,9 +3172,15 @@ class TLCamera(object):
         try:
             biny_min = c_int()
             biny_max = c_int()
-            error_code = self._sdk.tl_camera_get_biny_range(self._camera, biny_min, biny_max)
+            error_code = self._sdk.tl_camera_get_biny_range(
+                self._camera, biny_min, biny_max
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_biny_range", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_biny_range", error_code
+                    )
+                )
             return Range(int(biny_min.value), int(biny_max.value))
         except Exception as exception:
             _logger.error("Could not get biny range; " + str(exception))
@@ -2144,7 +3203,11 @@ class TLCamera(object):
             gain = c_int()
             error_code = self._sdk.tl_camera_get_gain(self._camera, gain)
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_gain", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_gain", error_code
+                    )
+                )
             return int(gain.value)
         except Exception as exception:
             _logger.error("Could not get gain; " + str(exception))
@@ -2156,7 +3219,11 @@ class TLCamera(object):
             c_value = c_int(gain)
             error_code = self._sdk.tl_camera_set_gain(self._camera, c_value)
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_gain", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_set_gain", error_code
+                    )
+                )
         except Exception as exception:
             _logger.error("Could not set gain; " + str(exception))
             raise exception
@@ -2171,9 +3238,15 @@ class TLCamera(object):
         """
         try:
             black_level = c_int()
-            error_code = self._sdk.tl_camera_get_black_level(self._camera, black_level)
+            error_code = self._sdk.tl_camera_get_black_level(
+                self._camera, black_level
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_black_level", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_black_level", error_code
+                    )
+                )
             return int(black_level.value)
         except Exception as exception:
             _logger.error("Could not get black level; " + str(exception))
@@ -2183,9 +3256,15 @@ class TLCamera(object):
     def black_level(self, black_level):
         try:
             c_value = c_int(black_level)
-            error_code = self._sdk.tl_camera_set_black_level(self._camera, c_value)
+            error_code = self._sdk.tl_camera_set_black_level(
+                self._camera, c_value
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_black_level", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_set_black_level", error_code
+                    )
+                )
         except Exception as exception:
             _logger.error("Could not set black level; " + str(exception))
             raise exception
@@ -2204,14 +3283,24 @@ class TLCamera(object):
         try:
             black_level_min = c_int()
             black_level_max = c_int()
-            error_code = self._sdk.tl_camera_get_black_level_range(self._camera, black_level_min, black_level_max)
+            error_code = self._sdk.tl_camera_get_black_level_range(
+                self._camera, black_level_min, black_level_max
+            )
             if error_code == 1002:
                 # Native library issue #
                 _logger.debug("Camera does not support black level range")
                 return Range(0, 0)
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_black_level_range", error_code))
-            return Range(int(black_level_min.value), int(black_level_max.value))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_black_level_range",
+                        error_code,
+                    )
+                )
+            return Range(
+                int(black_level_min.value), int(black_level_max.value)
+            )
         except Exception as exception:
             _logger.error("Could not get black level range; " + str(exception))
             raise exception
@@ -2225,9 +3314,15 @@ class TLCamera(object):
         """
         try:
             image_width_pixels = c_int()
-            error_code = self._sdk.tl_camera_get_image_width(self._camera, image_width_pixels)
+            error_code = self._sdk.tl_camera_get_image_width(
+                self._camera, image_width_pixels
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_image_width", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_image_width", error_code
+                    )
+                )
             return int(image_width_pixels.value)
         except Exception as exception:
             _logger.error("Could not get image width; " + str(exception))
@@ -2242,9 +3337,15 @@ class TLCamera(object):
         """
         try:
             image_height_pixels = c_int()
-            error_code = self._sdk.tl_camera_get_image_height(self._camera, image_height_pixels)
+            error_code = self._sdk.tl_camera_get_image_height(
+                self._camera, image_height_pixels
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_image_height_pixels", error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_image_height_pixels", error_code
+                    )
+                )
             return int(image_height_pixels.value)
         except Exception as exception:
             _logger.error("Could not get image height; " + str(exception))
@@ -2263,10 +3364,15 @@ class TLCamera(object):
         """
         try:
             polar_phase_type = c_int()
-            error_code = self._sdk.tl_camera_get_polar_phase(self._camera, polar_phase_type)
+            error_code = self._sdk.tl_camera_get_polar_phase(
+                self._camera, polar_phase_type
+            )
             if error_code != 0:
                 raise TLCameraError(
-                    _create_c_failure_message(self._sdk, "tl_camera_get_polar_phase", error_code))
+                    _create_c_failure_message(
+                        self._sdk, "tl_camera_get_polar_phase", error_code
+                    )
+                )
             return POLAR_PHASE(polar_phase_type.value)
         except Exception as exception:
             _logger.error("Could not get polar phase; " + str(exception))
@@ -2286,12 +3392,30 @@ class TLCamera(object):
         try:
             frame_rate_control_min = c_double()
             frame_rate_control_max = c_double()
-            error_code = self._sdk.tl_camera_get_frame_rate_control_value_range(self._camera, frame_rate_control_min, frame_rate_control_max)
+            error_code = (
+                self._sdk.tl_camera_get_frame_rate_control_value_range(
+                    self._camera,
+                    frame_rate_control_min,
+                    frame_rate_control_max,
+                )
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_frame_rate_control_value_range", error_code))
-            return Range(float(frame_rate_control_min.value), float(frame_rate_control_max.value))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_frame_rate_control_value_range",
+                        error_code,
+                    )
+                )
+            return Range(
+                float(frame_rate_control_min.value),
+                float(frame_rate_control_max.value),
+            )
         except Exception as exception:
-            _logger.error("Could not get frame rate control value range; " + str(exception))
+            _logger.error(
+                "Could not get frame rate control value range; "
+                + str(exception)
+            )
             raise exception
 
     @property
@@ -2311,28 +3435,45 @@ class TLCamera(object):
         """
         try:
             is_frame_rate_control_enabled = c_int()
-            error_code = self._sdk.tl_camera_get_is_frame_rate_control_enabled(self._camera,
-                                                                               is_frame_rate_control_enabled)
+            error_code = self._sdk.tl_camera_get_is_frame_rate_control_enabled(
+                self._camera, is_frame_rate_control_enabled
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk,
-                                                              "tl_camera_get_is_frame_rate_control_enabled",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_is_frame_rate_control_enabled",
+                        error_code,
+                    )
+                )
             return bool(is_frame_rate_control_enabled.value)
         except Exception as exception:
-            _logger.error("Could not get is frame rate control enabled; " + str(exception))
+            _logger.error(
+                "Could not get is frame rate control enabled; "
+                + str(exception)
+            )
             raise exception
 
     @is_frame_rate_control_enabled.setter
     def is_frame_rate_control_enabled(self, is_frame_rate_control_enabled):
         try:
             c_value = c_int(is_frame_rate_control_enabled)
-            error_code = self._sdk.tl_camera_set_is_frame_rate_control_enabled(self._camera, c_value)
+            error_code = self._sdk.tl_camera_set_is_frame_rate_control_enabled(
+                self._camera, c_value
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk,
-                                                              "tl_camera_set_is_frame_rate_control_enabled",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_set_is_frame_rate_control_enabled",
+                        error_code,
+                    )
+                )
         except Exception as exception:
-            _logger.error("Could not set is frame rate control enabled; " + str(exception))
+            _logger.error(
+                "Could not set is frame rate control enabled; "
+                + str(exception)
+            )
             raise exception
 
     @property
@@ -2346,25 +3487,43 @@ class TLCamera(object):
         """
         try:
             frame_rate_control = c_double()
-            error_code = self._sdk.tl_camera_get_frame_rate_control_value(self._camera, frame_rate_control)
+            error_code = self._sdk.tl_camera_get_frame_rate_control_value(
+                self._camera, frame_rate_control
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_get_frame_rate_control_value",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_get_frame_rate_control_value",
+                        error_code,
+                    )
+                )
             return float(frame_rate_control.value)
         except Exception as exception:
-            _logger.error("Could not get frame rate control; " + str(exception))
+            _logger.error(
+                "Could not get frame rate control; " + str(exception)
+            )
             raise exception
 
     @frame_rate_control_value.setter
     def frame_rate_control_value(self, frame_rate_control_value_fps):
         try:
             c_value = c_double(frame_rate_control_value_fps)
-            error_code = self._sdk.tl_camera_set_frame_rate_control_value(self._camera, c_value)
+            error_code = self._sdk.tl_camera_set_frame_rate_control_value(
+                self._camera, c_value
+            )
             if error_code != 0:
-                raise TLCameraError(_create_c_failure_message(self._sdk, "tl_camera_set_frame_rate_control_value",
-                                                              error_code))
+                raise TLCameraError(
+                    _create_c_failure_message(
+                        self._sdk,
+                        "tl_camera_set_frame_rate_control_value",
+                        error_code,
+                    )
+                )
         except Exception as exception:
-            _logger.error("Could not set frame rate control value; " + str(exception))
+            _logger.error(
+                "Could not set frame rate control value; " + str(exception)
+            )
             raise exception
 
 

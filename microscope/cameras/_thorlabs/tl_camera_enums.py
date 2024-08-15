@@ -16,6 +16,7 @@ class OPERATION_MODE(_CTypesEnum):
     The OPERATION_MODE enumeration defines the available modes for a camera.
 
     """
+
     SOFTWARE_TRIGGERED = 0
     """
     Use software operation mode to generate one or more frames per trigger or to run continuous video mode.
@@ -41,6 +42,7 @@ class SENSOR_TYPE(_CTypesEnum):
     This describes the physical capabilities of the camera sensor.
 
     """
+
     MONOCHROME = 0
     """
     Each pixel of the sensor indicates an intensity.
@@ -66,6 +68,7 @@ class TRIGGER_POLARITY(_CTypesEnum):
     values specify which edge of the input trigger pulse that will initiate image acquisition.
 
     """
+
     ACTIVE_HIGH = 0
     """
     Acquire an image on the RISING edge of the trigger pulse.
@@ -88,6 +91,7 @@ class EEP_STATUS(_CTypesEnum):
     current exposure value. If EEP is enabled in bulb mode, it will always give a status of Bulb.
 
     """
+
     DISABLED = 0
     """
     EEP mode is disabled.
@@ -115,6 +119,7 @@ class DATA_RATE(_CTypesEnum):
     The DATA_RATE enumeration defines the options for setting the desired image data delivery rate.
 
     """
+
     RESERVED1 = 0  # A RESERVED value (DO NOT USE).
     RESERVED2 = 1  # A RESERVED value (DO NOT USE).
     FPS_30 = 2
@@ -135,6 +140,7 @@ class USB_PORT_TYPE(_CTypesEnum):
     returned by SDK API functions and callbacks based on the type of physical USB port that the device is connected to.
 
     """
+
     USB1_0 = 0
     """
     The device is connected to a USB 1.0/1.1 port (1.5 Mbits/sec or 12 Mbits/sec).
@@ -159,6 +165,7 @@ class TAPS(_CTypesEnum):
     or 4 channels at a time.
 
     """
+
     SINGLE_TAP = 0
     """
     Charges are read out through a single analog-to-digital converter.
@@ -182,6 +189,7 @@ class COMMUNICATION_INTERFACE(_CTypesEnum):
     identified using USB_PORT_TYPE.
 
     """
+
     GIG_E = 0
     """
     The camera uses the GigE Vision (GigE) interface standard.

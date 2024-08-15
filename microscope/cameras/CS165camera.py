@@ -7,9 +7,17 @@ from pathlib import Path
 import logging
 import time
 
-from microscope.cameras._thorlabs.tl_camera import TLCameraSDK, TLCamera, Frame, OPERATION_MODE, ROI
+from microscope.cameras._thorlabs.tl_camera import (
+    TLCameraSDK,
+    TLCamera,
+    Frame,
+    OPERATION_MODE,
+    ROI,
+)
 from microscope.cameras._thorlabs.tl_camera_enums import SENSOR_TYPE
-from microscope.cameras._thorlabs.tl_mono_to_color_processor import MonoToColorProcessorSDK
+from microscope.cameras._thorlabs.tl_mono_to_color_processor import (
+    MonoToColorProcessorSDK,
+)
 from microscope.cameras._thorlabs.tl_mono_to_color_enums import COLOR_SPACE
 from microscope.cameras._thorlabs.tl_color_enums import FORMAT
 from microscope.simulators import _ImageGenerator
@@ -23,7 +31,7 @@ import queue
 _logger = logging.getLogger(__name__)
 
 # TODO: This needs serious investigation, I am just using another piece of code but i cant find similar code in SDK
-# NOTE(ADW): The rising edge seems to be trigger polarity on the SDK and the TLCAMERA.operation_mode is trigger 
+# NOTE(ADW): The rising edge seems to be trigger polarity on the SDK and the TLCAMERA.operation_mode is trigger
 # mode, se we should be passing these tuples to those setters respectively.
 SDK3_STRING_TO_TRIGGER = {
     "external": (
@@ -36,6 +44,7 @@ SDK3_STRING_TO_TRIGGER = {
     ),
     "software": (microscope.TriggerType.SOFTWARE, microscope.TriggerMode.ONCE),
 }
+
 
 class CS165CUCamera(microscope.abc.Camera):
     """
@@ -91,13 +100,16 @@ class CS165CUCamera(microscope.abc.Camera):
         camera_GUI(root, dispose): Starts camera GUI
 
     """
-    def __init__(self,
-                 camera_number=None,  # The number in the list of cameras of the camera we want to get
-                 camera_name=None,  # Name of camera
-                 ini_acq=False,  # Whether to initialize the acquisition with the default values
-                 verbose=True,  # If True, info in printed in terminal
-                 very_verbose=False,
-                 simulated=False):  # If True, more info in printed in terminal
+
+    def __init__(
+        self,
+        camera_number=None,  # The number in the list of cameras of the camera we want to get
+        camera_name=None,  # Name of camera
+        ini_acq=False,  # Whether to initialize the acquisition with the default values
+        verbose=True,  # If True, info in printed in terminal
+        very_verbose=False,
+        simulated=False,
+    ):  # If True, more info in printed in terminal
         super().__init__()
         self._gain = 0
         self.add_setting(
@@ -107,9 +119,11 @@ class CS165CUCamera(microscope.abc.Camera):
             self._set_gain,
             lambda: (0, 8192),
         )
-        
+
         # TODO: this obviously needs a proper solution:
-        os.add_dll_directory("C:\Program Files\Thorlabs\Scientific Imaging\ThorCam")
+        os.add_dll_directory(
+            "C:\Program Files\Thorlabs\Scientific Imaging\ThorCam"
+        )
         # TODO: we can't hard set the trigger mode really
         self._trigger_mode = "software"
         self._acquiring = False
@@ -124,11 +138,11 @@ class CS165CUCamera(microscope.abc.Camera):
             self._binning = microscope.Binning(1, 1)
             self._exposure_time = 0.1
             self.add_setting(
-            "image pattern",
-            "enum",
-            self._image_generator.method,
-            self._image_generator.set_method,
-            self._image_generator.get_methods,
+                "image pattern",
+                "enum",
+                self._image_generator.method,
+                self._image_generator.set_method,
+                self._image_generator.get_methods,
             )
             self.add_setting(
                 "image data type",
@@ -144,11 +158,13 @@ class CS165CUCamera(microscope.abc.Camera):
                 self._image_generator.enable_numbering,
                 None,
             )
-        self._is_color = False # TODO: This is a hack that needs removed later.
+        self._is_color = (
+            False  # TODO: This is a hack that needs removed later.
+        )
         self.verbose = verbose
         self.very_verbose = very_verbose
         self.camera_name = camera_name
-        try: # TODO: This is a hack that needs removed later.
+        try:  # TODO: This is a hack that needs removed later.
             self.sdk = TLCameraSDK()
             self.camera_list = self.sdk.discover_available_cameras()
         except:
@@ -170,11 +186,19 @@ class CS165CUCamera(microscope.abc.Camera):
                 # Select camera from list
                 print(self.camera_list)
                 try:
-                    user_input = int(input(f"Enter integer of the camera that needs to be selected: "))
+                    user_input = int(
+                        input(
+                            f"Enter integer of the camera that needs to be selected: "
+                        )
+                    )
                     if 0 <= user_input <= len(self.camera_list) - 1:
-                        self.camera = self.sdk.open_camera(self.camera_list[user_input])
+                        self.camera = self.sdk.open_camera(
+                            self.camera_list[user_input]
+                        )
                     else:
-                        print(f"Input should be an integer between 0 and {len(self.camera_list) - 1}. Try again.")
+                        print(
+                            f"Input should be an integer between 0 and {len(self.camera_list) - 1}. Try again."
+                        )
                 except ValueError:
                     print("Invalid input. Please enter an integer.")
 
@@ -204,14 +228,16 @@ class CS165CUCamera(microscope.abc.Camera):
         self._sent = 0
         _logger.info("Acquisition enabled.")
         return True
-    
+
     # TODO: This is placeholder code
     def get_cycle_time(self) -> float:
         return 1.0
+
     # TODO: This is placeholder code, these methods must exist on the sdk
     def get_exposure_time(self) -> float:
         return 0.1
-    # TODO: cant imagine this wont need more work 
+
+    # TODO: cant imagine this wont need more work
     def soft_trigger(self):
         self._do_trigger()
 
@@ -223,7 +249,9 @@ class CS165CUCamera(microscope.abc.Camera):
             try:
                 self.mono_to_color_processor.dispose()
             except Exception as exception:
-                print(f"Unable to dispose Mono to Color processor: {exception}")
+                print(
+                    f"Unable to dispose Mono to Color processor: {exception}"
+                )
             try:
                 self.mono_to_color_sdk.dispose()
             except Exception as exception:
@@ -236,7 +264,7 @@ class CS165CUCamera(microscope.abc.Camera):
             self.sdk.dispose()
         except Exception as exception:
             print(f"Unable to dispose TLCamera_SDK: {exception}")
-    
+
     def abort(self):
         """Aborts the camera acquisition."""
         # TODO: work out how to do this. I suspect it is with disarm
@@ -251,7 +279,9 @@ class CS165CUCamera(microscope.abc.Camera):
         try:
             self.camera.name = camera_name
         except Exception as error:
-            print(f"Encountered error: {error}, camera name could not be set to {camera_name}.")
+            print(
+                f"Encountered error: {error}, camera name could not be set to {camera_name}."
+            )
             self.dispose()
         if self.verbose:
             print(f"Camera name has been set to {camera_name}.")
@@ -263,7 +293,10 @@ class CS165CUCamera(microscope.abc.Camera):
         Returns:
             list: Sensor dimensions [height, width] in pixels.
         """
-        return [self.camera.image_height_pixels, self.camera.image_width_pixels]
+        return [
+            self.camera.image_height_pixels,
+            self.camera.image_width_pixels,
+        ]
 
     def get_pixel_size(self):
         """Returns pixel dimensions in um.
@@ -271,7 +304,10 @@ class CS165CUCamera(microscope.abc.Camera):
         Returns:
             list: Pixel dimensions [height, width] in um.
         """
-        return [self.camera.sensor_pixel_height_um, self.camera.sensor_pixel_width_um]
+        return [
+            self.camera.sensor_pixel_height_um,
+            self.camera.sensor_pixel_width_um,
+        ]
 
     def get_sensor_size_um(self):
         """Returns sensor dimensions in um.
@@ -279,12 +315,17 @@ class CS165CUCamera(microscope.abc.Camera):
         Returns:
             list: Sensor dimensions [height, width] in um.
         """
-        return (np.array(self.get_sensor_pixel_size()) * np.array(self.get_pixel_size())).tolist()
+        return (
+            np.array(self.get_sensor_pixel_size())
+            * np.array(self.get_pixel_size())
+        ).tolist()
 
     def set_metadata(self):
         """Sets camera metadata."""
-        self.metadata = dict(Camera_Sensor_Size_HxW=self.get_sensor_pixel_size(),
-                             Camera_Pixel_Size_HxW=self.get_pixel_size())
+        self.metadata = dict(
+            Camera_Sensor_Size_HxW=self.get_sensor_pixel_size(),
+            Camera_Pixel_Size_HxW=self.get_pixel_size(),
+        )
 
     def get_metadata(self):
         """Returns camera metadata.
@@ -297,14 +338,17 @@ class CS165CUCamera(microscope.abc.Camera):
     # --- Color processing functions ---
     def initialize_mono_to_color_processor(self):
         """Initializes mono to color processor if the camera is color."""
-        if not hasattr(self, 'mono_to_color_processor'):
-            setattr(self, 'mono_to_color_processor', None)
-        self.mono_to_color_processor = self.mono_to_color_sdk.create_mono_to_color_processor(
-            self.camera.camera_sensor_type,
-            self.camera.color_filter_array_phase,
-            self.camera.get_color_correction_matrix(),
-            self.camera.get_default_white_balance_matrix(),
-            self.camera.bit_depth)
+        if not hasattr(self, "mono_to_color_processor"):
+            setattr(self, "mono_to_color_processor", None)
+        self.mono_to_color_processor = (
+            self.mono_to_color_sdk.create_mono_to_color_processor(
+                self.camera.camera_sensor_type,
+                self.camera.color_filter_array_phase,
+                self.camera.get_color_correction_matrix(),
+                self.camera.get_default_white_balance_matrix(),
+                self.camera.bit_depth,
+            )
+        )
 
     def set_color_processor_gains(self, RGB):
         """Sets the RGB gains of the color processor.
@@ -319,7 +363,12 @@ class CS165CUCamera(microscope.abc.Camera):
         else:
             raise ValueError("Input parameter RGB length must be 3")
 
-    def set_color_processor_properties(self, color_space=COLOR_SPACE.SRGB, output_format=FORMAT.RGB_PIXEL, verbose=False):
+    def set_color_processor_properties(
+        self,
+        color_space=COLOR_SPACE.SRGB,
+        output_format=FORMAT.RGB_PIXEL,
+        verbose=False,
+    ):
         """Sets properties of color processor.
 
         Args:
@@ -330,7 +379,7 @@ class CS165CUCamera(microscope.abc.Camera):
         self.mono_to_color_processor.color_space = color_space
         self.mono_to_color_processor.output_format = output_format
         if verbose:
-            print('Color processor properties set to:')
+            print("Color processor properties set to:")
             self.get_color_processor_properties(verbose=True)
 
     def get_color_processor_gains(self, verbose=False):
@@ -346,7 +395,9 @@ class CS165CUCamera(microscope.abc.Camera):
         green_gain = self.mono_to_color_processor.green_gain
         blue_gain = self.mono_to_color_processor.blue_gain
         if verbose:
-            print(f'Color gains: R {red_gain} - G {green_gain} - B {blue_gain}')
+            print(
+                f"Color gains: R {red_gain} - G {green_gain} - B {blue_gain}"
+            )
         return [red_gain, green_gain, blue_gain]
 
     def get_color_processor_properties(self, verbose=True):
@@ -358,12 +409,14 @@ class CS165CUCamera(microscope.abc.Camera):
         Returns:
             dict: Dictionary with color processor properties.
         """
-        keys = ['color_space', 'output_format']
-        values = [self.mono_to_color_processor.color_space,
-                  self.mono_to_color_processor.output_format]
+        keys = ["color_space", "output_format"]
+        values = [
+            self.mono_to_color_processor.color_space,
+            self.mono_to_color_processor.output_format,
+        ]
         props = dict(zip(keys, values))  # Dictionary with properties
         if verbose:
-            print('Color processor properties:')
+            print("Color processor properties:")
             print(list(props.items()))
             self.get_color_processor_gains(verbose=True)
         return props
@@ -378,19 +431,27 @@ class CS165CUCamera(microscope.abc.Camera):
         try:
             self.camera.image_poll_timeout_ms = image_poll_timeout_ms
         except Exception as error:
-            print(f"Encountered error: {error}, image poll timeout could not be set to {image_poll_timeout_ms} ms.")
+            print(
+                f"Encountered error: {error}, image poll timeout could not be set to {image_poll_timeout_ms} ms."
+            )
             self.dispose()
         if self.verbose:
-            print(f"Camera image poll timeout has been set to {image_poll_timeout_ms} ms.")
+            print(
+                f"Camera image poll timeout has been set to {image_poll_timeout_ms} ms."
+            )
 
-    def set_frames_per_trigger_zero_for_unlimited(self, frames_per_trigger_zero_for_unlimited):
+    def set_frames_per_trigger_zero_for_unlimited(
+        self, frames_per_trigger_zero_for_unlimited
+    ):
         """Sets the number of frames generated per software or hardware trigger.
 
         Args:
             frames_per_trigger_zero_for_unlimited (int): Number of frames per trigger. Set to 0 for unlimited.
         """
         try:
-            self.camera.image_poll_timeout_ms = frames_per_trigger_zero_for_unlimited
+            self.camera.image_poll_timeout_ms = (
+                frames_per_trigger_zero_for_unlimited
+            )
         except Exception as error:
             print(
                 f"Encountered error: {error}, number of frames generated per software or hardware trigger could not be set to {frames_per_trigger_zero_for_unlimited}."
@@ -420,21 +481,25 @@ class CS165CUCamera(microscope.abc.Camera):
         try:
             self.camera.exposure_time_us = exposure_time_us
         except Exception as error:
-            print(f"Encountered error: {error}, exposure time us could not be set to {exposure_time_us} us.")
+            print(
+                f"Encountered error: {error}, exposure time us could not be set to {exposure_time_us} us."
+            )
             self.dispose()
         if self.verbose:
-            print(f"Camera exposure time has been set to {exposure_time_us} us.")
-    
+            print(
+                f"Camera exposure time has been set to {exposure_time_us} us."
+            )
+
     def _get_binning(self):
         """Returns the binning of the camera."""
         # TODO: implement this using get_binx / biny from the SDK.
         return
-    
+
     def _set_binning(self):
         """Returns the binning of the camera."""
         # TODO: implement this using binx / biny setter from the SDK.
         return
-    
+
     # TODO: replace this with add sedtting
     def set_trigger(self, trigger_mode):
         """set the trigger mode of the camera."""
@@ -445,7 +510,7 @@ class CS165CUCamera(microscope.abc.Camera):
     def trigger_mode(self) -> microscope.TriggerMode:
         trigger_string = self._trigger_mode.lower()
         return SDK3_STRING_TO_TRIGGER[trigger_string][1]
-    
+
     @property
     def trigger_type(self):
         trigger_string = self._trigger_mode.lower()
@@ -464,9 +529,11 @@ class CS165CUCamera(microscope.abc.Camera):
             if self.verbose:
                 print(f"Camera region of interest has been set to {roi}")
         except Exception as error:
-            print(f"Encountered error: {error}, region of interest could not be set to {roi}.")
+            print(
+                f"Encountered error: {error}, region of interest could not be set to {roi}."
+            )
             self.dispose()
-    
+
     # TODO: This is simulated stuff.
     def _set_gain(self, value):
         self._gain = value
@@ -487,14 +554,20 @@ class CS165CUCamera(microscope.abc.Camera):
             return
         if self.camera.frames_per_trigger_zero_for_unlimited != 0:
             try:
-                self.set_frames_per_trigger_zero_for_unlimited(0)  # start camera in continuous mode
+                self.set_frames_per_trigger_zero_for_unlimited(
+                    0
+                )  # start camera in continuous mode
                 if self.verbose:
                     print(f"Camera set to continuous mode.")
             except Exception as error:
-                print(f"Encountered error: {error}, camera could not be set to continuous mode.")
+                print(
+                    f"Encountered error: {error}, camera could not be set to continuous mode."
+                )
                 self.dispose()
 
-    def _do_trigger(self, exp_time_us=11000, poll_timeout_ms=1000, verbose=False):
+    def _do_trigger(
+        self, exp_time_us=11000, poll_timeout_ms=1000, verbose=False
+    ):
         """Initializes camera acquisition with specified parameters."""
         self._triggered += 1
         if self.simulated:
@@ -503,7 +576,9 @@ class CS165CUCamera(microscope.abc.Camera):
             print(f"Initializing {self.camera_name} camera acquisition")
         self.set_exposure_time_us(exp_time_us)  # set exposure in us
         self.set_continuous_mode()  # start camera in continuous mode
-        self.set_image_poll_timeout_ms(poll_timeout_ms)  # 1 second polling timeout
+        self.set_image_poll_timeout_ms(
+            poll_timeout_ms
+        )  # 1 second polling timeout
         if not self.camera.is_armed:
             self.camera.arm(2)
         self.camera.issue_software_trigger()
@@ -530,6 +605,7 @@ class CS165CUCamera(microscope.abc.Camera):
             self.camera.disarm()
 
     def _fetch_data(self, rescale=False, target_bpp=8):
+        # TODO: None of these kwargs will do anything in the new implementation
         """Gets an image from the camera.
 
         Args:
@@ -556,12 +632,15 @@ class CS165CUCamera(microscope.abc.Camera):
             frame = self.get_frame()
             if rescale:
                 # Bitwise right shift to scale down image
-                image = frame.image_buffer >> (self.camera.bit_depth - target_bpp)
+                image = frame.image_buffer >> (
+                    self.camera.bit_depth - target_bpp
+                )
             else:
                 image = frame.image_buffer
             self._sent += 1
             self._triggered
-            return Image.fromarray(image)
+            # TODO: This needs to check the image format is just an ndarray as expected.
+            return image
 
     def get_raw_color_image(self, transform_key="48", reshape=True):
         """Gets a raw color image from the camera.
@@ -576,30 +655,55 @@ class CS165CUCamera(microscope.abc.Camera):
         frame = self.get_frame()
 
         if self.very_verbose:
-            print(f"Red Gain = {self.mono_to_color_processor.red_gain}\n"
-                  f"Green Gain = {self.mono_to_color_processor.green_gain}\n"
-                  f"Blue Gain = {self.mono_to_color_processor.blue_gain}\n")
+            print(
+                f"Red Gain = {self.mono_to_color_processor.red_gain}\n"
+                f"Green Gain = {self.mono_to_color_processor.green_gain}\n"
+                f"Blue Gain = {self.mono_to_color_processor.blue_gain}\n"
+            )
 
         if transform_key == "48":
             # Convert to 48-bit RGB image
-            colorImage = self.mono_to_color_processor.transform_to_48(frame.image_buffer, self.camera.image_width_pixels,
-                                                                     self.camera.image_height_pixels)
+            colorImage = self.mono_to_color_processor.transform_to_48(
+                frame.image_buffer,
+                self.camera.image_width_pixels,
+                self.camera.image_height_pixels,
+            )
             if reshape:
-                colorImage = colorImage.reshape(self.camera.image_height_pixels, self.camera.image_width_pixels, 3)
+                colorImage = colorImage.reshape(
+                    self.camera.image_height_pixels,
+                    self.camera.image_width_pixels,
+                    3,
+                )
         elif transform_key == "32":
             # Convert to 32-bit RGBA image
-            colorImage = self.mono_to_color_processor.transform_to_32(frame.image_buffer, self.camera.image_width_pixels,
-                                                                     self.camera.image_height_pixels)
+            colorImage = self.mono_to_color_processor.transform_to_32(
+                frame.image_buffer,
+                self.camera.image_width_pixels,
+                self.camera.image_height_pixels,
+            )
             if reshape:
-                colorImage = colorImage.reshape(self.camera.image_height_pixels, self.camera.image_width_pixels, 4)
+                colorImage = colorImage.reshape(
+                    self.camera.image_height_pixels,
+                    self.camera.image_width_pixels,
+                    4,
+                )
         elif transform_key == "24":
             # Convert to 24-bit RGB image
-            colorImage = self.mono_to_color_processor.transform_to_24(frame.image_buffer, self.camera.image_width_pixels,
-                                                                     self.camera.image_height_pixels)
+            colorImage = self.mono_to_color_processor.transform_to_24(
+                frame.image_buffer,
+                self.camera.image_width_pixels,
+                self.camera.image_height_pixels,
+            )
             if reshape:
-                colorImage = colorImage.reshape(self.camera.image_height_pixels, self.camera.image_width_pixels, 3)
+                colorImage = colorImage.reshape(
+                    self.camera.image_height_pixels,
+                    self.camera.image_width_pixels,
+                    3,
+                )
         else:
-            raise ValueError(f"{transform_key} is not a valid key for color transformation.")
+            raise ValueError(
+                f"{transform_key} is not a valid key for color transformation."
+            )
 
         return colorImage
 
@@ -612,10 +716,18 @@ class CS165CUCamera(microscope.abc.Camera):
         Returns:
             Image: PIL Image object.
         """
-        return Image.fromarray(self.get_raw_color_image(transform_key), mode='RGB')
+        return Image.fromarray(
+            self.get_raw_color_image(transform_key), mode="RGB"
+        )
 
-    def save_color_image(self, img_name, img_format='png', folder_path='', color_transformation='48',
-                         metadata_dict=None):
+    def save_color_image(
+        self,
+        img_name,
+        img_format="png",
+        folder_path="",
+        color_transformation="48",
+        metadata_dict=None,
+    ):
         """Saves a color image with optional metadata.
 
         Args:
@@ -632,10 +744,13 @@ class CS165CUCamera(microscope.abc.Camera):
             # Create PngInfo object
             metadata = PngImagePlugin.PngInfo()
             # Add metadata
-            metadata.add_text('metadata', metadata_string)
-            img.save(os.path.join(folder_path, f'{img_name}.{img_format}'), pnginfo=metadata)
+            metadata.add_text("metadata", metadata_string)
+            img.save(
+                os.path.join(folder_path, f"{img_name}.{img_format}"),
+                pnginfo=metadata,
+            )
         else:
-            img.save(os.path.join(folder_path, f'{img_name}.{img_format}'))
+            img.save(os.path.join(folder_path, f"{img_name}.{img_format}"))
         return img
 
     def read_color_image(self, img_path):
@@ -650,7 +765,7 @@ class CS165CUCamera(microscope.abc.Camera):
         # Open the image
         image = Image.open(img_path)
         # Get the metadata
-        metadata_string = image.info.get('metadata')
+        metadata_string = image.info.get("metadata")
         # If metadata exists, convert it from JSON to a dictionary
         if metadata_string is not None:
             metadata_dict = json.loads(metadata_string)
@@ -738,6 +853,7 @@ class ImageAcquisitionThread(threading.Thread):
         camera_controller (CS165CUCamera): The camera controller instance.
 
     """
+
     def __init__(self, camera_controller):
         # type: (TLCamera) -> ImageAcquisitionThread
         super(ImageAcquisitionThread, self).__init__()
@@ -751,16 +867,20 @@ class ImageAcquisitionThread(threading.Thread):
             self._mono_to_color_sdk = camera_controller.mono_to_color_sdk
             self._image_width = self._camera.image_width_pixels
             self._image_height = self._camera.image_height_pixels
-            self._mono_to_color_processor = self._mono_to_color_sdk.create_mono_to_color_processor(
-                SENSOR_TYPE.BAYER,
-                self._camera.color_filter_array_phase,
-                self._camera.get_color_correction_matrix(),
-                self._camera.get_default_white_balance_matrix(),
-                self._camera.bit_depth
+            self._mono_to_color_processor = (
+                self._mono_to_color_sdk.create_mono_to_color_processor(
+                    SENSOR_TYPE.BAYER,
+                    self._camera.color_filter_array_phase,
+                    self._camera.get_color_correction_matrix(),
+                    self._camera.get_default_white_balance_matrix(),
+                    self._camera.bit_depth,
+                )
             )
             self._is_color = True
         self._bit_depth = camera_controller.camera.bit_depth
-        self._camera.image_poll_timeout_ms = 0  # Do not want to block for long periods of time
+        self._camera.image_poll_timeout_ms = (
+            0  # Do not want to block for long periods of time
+        )
         self._image_queue = queue.Queue(maxsize=2)
         self._stop_event = threading.Event()
 
@@ -794,14 +914,18 @@ class ImageAcquisitionThread(threading.Thread):
         if (width != self._image_width) or (height != self._image_height):
             self._image_width = width
             self._image_height = height
-            print("Image dimension change detected, image acquisition thread was updated")
+            print(
+                "Image dimension change detected, image acquisition thread was updated"
+            )
         # color the image. transform_to_24 will scale to 8 bits per channel
-        color_image_data = self._mono_to_color_processor.transform_to_24(frame.image_buffer,
-                                                                         self._image_width,
-                                                                         self._image_height)
-        color_image_data = color_image_data.reshape(self._image_height, self._image_width, 3)
+        color_image_data = self._mono_to_color_processor.transform_to_24(
+            frame.image_buffer, self._image_width, self._image_height
+        )
+        color_image_data = color_image_data.reshape(
+            self._image_height, self._image_width, 3
+        )
         # return PIL Image object
-        return Image.fromarray(color_image_data, mode='RGB')
+        return Image.fromarray(color_image_data, mode="RGB")
 
     def _get_image(self, frame):
         """
@@ -833,7 +957,11 @@ class ImageAcquisitionThread(threading.Thread):
                 # No point in keeping this image around when the queue is full, let's skip to the next one
                 pass
             except Exception as error:
-                print("Encountered error: {error}, image acquisition will stop.".format(error=error))
+                print(
+                    "Encountered error: {error}, image acquisition will stop.".format(
+                        error=error
+                    )
+                )
                 break
         print("Image acquisition has stopped")
 
@@ -842,11 +970,11 @@ class CS165CUBRCamera(CS165CUCamera):
     """
     Raman camera controller for the Thorlabs CS165CU camera.
 
-    This class implements the `BRamanCamera` interface using the `CS165CUCamera` class 
+    This class implements the `BRamanCamera` interface using the `CS165CUCamera` class
     to provide control over the Thorlabs CS165CU Raman camera.
 
     Attributes:
-        config (dict): Configuration dictionary for the camera. 
+        config (dict): Configuration dictionary for the camera.
         name (str): The name of the camera.
 
     Args:
@@ -855,28 +983,30 @@ class CS165CUBRCamera(CS165CUCamera):
     """
 
     def __init__(self, **kwargs):
-        #self.config = config
-        #self.name = self.config.get("name", "CS165CU")
+        # self.config = config
+        # self.name = self.config.get("name", "CS165CU")
         # TODO: reinstate configuration
         super().__init__(self, **kwargs)
 
     def _fetch_data(self, color=True):
-        """Acquires a color image from the camera. 
+        """Acquires a color image from the camera.
 
         Args:
-            color (bool, optional): This argument is ignored as the CS165CU 
+            color (bool, optional): This argument is ignored as the CS165CU
             camera only captures color images. Defaults to True.
 
         Returns:
-            Image: The acquired PIL Image object. 
+            Image: The acquired PIL Image object.
 
         """
         if self.simulated:
             # TODO: these fake images can be made a single fixture and with size set by pixel size etc.
-            return Image.fromarray(np.random.randint(0, 255, (512, 512), dtype=np.uint8))
-        return CS165CUCamera.get_color_image(self, transform_key="48") 
+            return Image.fromarray(
+                np.random.randint(0, 255, (512, 512), dtype=np.uint8)
+            )
+        return CS165CUCamera.get_color_image(self, transform_key="48")
 
-    def _close(self, force= False, verbose=True): 
+    def _close(self, force=False, verbose=True):
         """
         Closes the camera, ensuring any necessary cleanup is performed.
 
@@ -892,14 +1022,16 @@ class CS165CUBRCamera(CS165CUCamera):
         Initializes the camera.
 
         Prepares the camera for operation, if needed.
-        
+
         Args:
             verbose (bool): If True, enables verbose output during the operation.
 
         """
         if verbose:
             print(f"Initializing camera {self.name}...")
-        super().initialize_acquisition(self, exp_time_us=11000, poll_timeout_ms=1000, verbose=True)
+        super().initialize_acquisition(
+            self, exp_time_us=11000, poll_timeout_ms=1000, verbose=True
+        )
         if verbose:
             print(f"Camera {self.name} INITIALIZED.")
 
@@ -909,8 +1041,9 @@ class CS165CUBRCamera(CS165CUCamera):
 
         Args:
             gain (float): The gain value in dB.
-        """ 
+        """
         warnings.warn("CSU165 camera cannot gain method not defined!")
+
 
 if __name__ == "__main__":
     camera = CS165CUCamera(simulated=True)

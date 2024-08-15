@@ -30,6 +30,7 @@ class POLAR_PHASE(_CTypesEnum):
 
 
     """
+
     PolarPhase0 = 0
     """
     0 degrees polarization phase 

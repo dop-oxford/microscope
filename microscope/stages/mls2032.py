@@ -1,5 +1,6 @@
-
 from microscope.stages.generic import BRamanXYStage
+
+
 class MLS2032Stage(BRamanXYStage):
     def __init__(self, *args, **kwargs):
         # TODO: Add the controller as a kwarg.
@@ -7,8 +8,15 @@ class MLS2032Stage(BRamanXYStage):
         self.initialize()
 
     # NOTE: It makes sense from Alvaros comments that we call self.conn in this class.
-        
-    def initialize(self, home=True, force_home=False, max_vel=None, acc=None, verbose=False):
+
+    def initialize(
+        self,
+        home=True,
+        force_home=False,
+        max_vel=None,
+        acc=None,
+        verbose=False,
+    ):
         """Initializes the XY stage with given parameters.
 
         Args:
@@ -21,15 +29,23 @@ class MLS2032Stage(BRamanXYStage):
 
         # TODO: these settings can all be done with add_setting I give examples below:
         # NOTE(ADW): here that i am passing empty lambdas but these are the getter and setter methods
-        self.add_setting('force_home', "bool", lambda *args: None, lambda *args: None, lambda *args: [True, False])
-        self.set_setting('force_home', False)
+        self.add_setting(
+            "force_home",
+            "bool",
+            lambda *args: None,
+            lambda *args: None,
+            lambda *args: [True, False],
+        )
+        self.set_setting("force_home", False)
         # self.add_setting('max_vel', "float", lambda *args: None, lambda *args: None, None)
         # self.set_setting('max_vel', max_vel)
         # if max_vel is not None or acc is not None: TO BE REMOVED
         #     self.set_velocity_params(channel=None, max_vel=max_vel, acc=acc, verbose=verbose)
 
     # TODO: For things like this we can be calling the controller but I can't see if this is necessary
-    def set_velocity_params(self, channel=None, max_vel=None, acc=None, verbose=False):
+    def set_velocity_params(
+        self, channel=None, max_vel=None, acc=None, verbose=False
+    ):
         """Sets the velocity and acceleration parameters of the XY stage.
 
         Args:
@@ -41,7 +57,9 @@ class MLS2032Stage(BRamanXYStage):
         """
         # BBD30XController.set_velocity_params(self, channel, max_vel, acc, verbose)
 
-    def move_mm(self, target_pos, channel, relative, max_vel, acc, permanent, verbose):
+    def move_mm(
+        self, target_pos, channel, relative, max_vel, acc, permanent, verbose
+    ):
         """Moves the XY stage to a specified end position.
 
         Args:
@@ -82,7 +100,8 @@ class MLS2032Stage(BRamanXYStage):
             verbose (bool): If True, enables verbose output during cleanup.
 
         """
-        # BBD30XController.finish(self, verbose=verbose) 
+        # BBD30XController.finish(self, verbose=verbose)
+
 
 if __name__ == "__main__":
     stage = MLS2032Stage()
