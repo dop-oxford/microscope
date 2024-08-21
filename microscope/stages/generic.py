@@ -103,9 +103,6 @@ class BRamanZStage(microscope.abc.Stage):
 
         self.homed = False
 
-    # TODO: All this code needs to be moved to the zfm class, its just here to allow an instance to be created.
-    # Instead, the abstract methods should be implemented in the zfm class.
-
     # These are the "Stage" specific methods
     def axes(self):
         return self._axes
