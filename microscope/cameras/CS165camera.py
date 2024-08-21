@@ -269,7 +269,7 @@ class CS165CUCamera(microscope.abc.Camera):
             list: Sensor dimensions [height, width] in pixels.
         """
         if self.simulated:
-            return self.simulated_settings.get('sensor_shape', [512, 512])  # Default simulated sensor shape
+            return self._simulated_settings.get('sensor_shape', [512, 512])  # Default simulated sensor shape
         return [
             self.camera.image_height_pixels,
             self.camera.image_width_pixels,
@@ -282,7 +282,7 @@ class CS165CUCamera(microscope.abc.Camera):
             list: Pixel dimensions [height, width] in micrometers (um).
         """
         if self.simulated:
-            return self.simulated_settings.get('pixel_size', [6.5, 6.5])  # Default simulated pixel size in um
+            return self._simulated_settings.get('pixel_size', [6.5, 6.5])  # Default simulated pixel size in um
         return [
             self.camera.sensor_pixel_height_um,
             self.camera.sensor_pixel_width_um,
@@ -444,7 +444,7 @@ class CS165CUCamera(microscope.abc.Camera):
     def get_exposure_time(self) -> float:
         """Get exposure time in seconds."""
         if self.simulated:
-            return self.simulated_settings.get('exposure_time', 0.1)  # Default simulated exposure time in seconds
+            return self._simulated_settings.get('exposure_time', 0.1)  # Default simulated exposure time in seconds
         return self.camera.exposure_time_us * 1e-6
 
     def set_exposure_time(self, exposure_time):
@@ -454,7 +454,7 @@ class CS165CUCamera(microscope.abc.Camera):
             exposure_time (float): Camera exposure time in seconds.
         """
         if self.simulated:
-            self.simulated_settings['exposure_time'] = exposure_time
+            self._simulated_settings['exposure_time'] = exposure_time
         else:
             self.set_exposure_time_us(exposure_time * 1e6)
 
@@ -465,7 +465,7 @@ class CS165CUCamera(microscope.abc.Camera):
             exposure_time_us (int): Camera exposure time in us.
         """
         if self.simulated:
-            self.simulated_settings['exposure_time_us'] = exposure_time_us
+            self._simulated_settings['exposure_time_us'] = exposure_time_us
         else:
             try:
                 self.camera.exposure_time_us = exposure_time_us
@@ -482,7 +482,7 @@ class CS165CUCamera(microscope.abc.Camera):
     def _get_binning(self):
         """Returns the binning of the camera."""
         if self.simulated:
-            return self.simulated_settings.get('binning', microscope.Binning(1, 1))  # Default binning if not set
+            return self._simulated_settings.get('binning', microscope.Binning(1, 1))  # Default binning if not set
         h = self.camera.binx
         v = self.camera.biny
         return microscope.Binning(h, v)
@@ -490,7 +490,7 @@ class CS165CUCamera(microscope.abc.Camera):
     def _set_binning(self, binning: microscope.Binning):
         """Sets the binning of the camera."""
         if self.simulated:
-            self.simulated_settings['binning'] = binning
+            self._simulated_settings['binning'] = binning
         else:
             self.camera.binx = binning.h
             self.camera.biny = binning.v
@@ -518,7 +518,7 @@ class CS165CUCamera(microscope.abc.Camera):
             roi (tuple): Region of interest (x, y, width, height).
         """
         if self.simulated:
-            self.simulated_settings['roi'] = roi  # Store ROI in simulated settings
+            self._simulated_settings['roi'] = roi  # Store ROI in simulated settings
             if self.verbose:
                 print(f"Simulated camera region of interest has been set to {roi}")
         else:
@@ -535,7 +535,7 @@ class CS165CUCamera(microscope.abc.Camera):
     def _set_gain(self, value):
         """Sets the gain of the camera."""
         if self.simulated:
-            self.simulated_settings['gain'] = value  # Store gain in simulated settings
+            self._simulated_settings['gain'] = value  # Store gain in simulated settings
         else:
             self._gain = value
 
@@ -546,7 +546,7 @@ class CS165CUCamera(microscope.abc.Camera):
             tuple: Region of interest (x, y, width, height).
         """
         if self.simulated:
-            return self.simulated_settings.get('roi', (0, 0, 512, 512))  # Default simulated ROI
+            return self._simulated_settings.get('roi', (0, 0, 512, 512))  # Default simulated ROI
         return self.camera.roi
 
     def set_continuous_mode(self):
@@ -619,12 +619,12 @@ class CS165CUCamera(microscope.abc.Camera):
         """
         if self._acquiring and self._triggered > 0:
             _logger.info("Sending image")
-            time.sleep(self._exposure_time)
+            time.sleep(self.get_cycle_time())
             if self.simulated:
                 dark = int(32 * np.random.rand())
                 light = int(255 - 128 * np.random.rand())
-                width = self._roi.width // self._binning.h
-                height = self._roi.height // self._binning.v
+                width = self.get_roi().width
+                height = self.get_roi().height
                 image = self._image_generator.get_image(
                     width, height, dark, light, index=self._sent
                 )
