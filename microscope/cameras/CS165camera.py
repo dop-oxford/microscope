@@ -495,11 +495,11 @@ class CS165CUCamera(microscope.abc.Camera):
             self.camera.binx = binning.h
             self.camera.biny = binning.v
 
-        # TODO: replace this with add sedtting
-        def set_trigger(self, trigger_mode):
-            """set the trigger mode of the camera."""
-            # TODO: this probably is not right
-            self._trigger_mode = trigger_mode
+    # TODO: replace this with add sedtting
+    def set_trigger(self, trigger_mode):
+        """set the trigger mode of the camera."""
+        # TODO: this probably is not right
+        self._trigger_mode = trigger_mode
 
     @property
     def trigger_mode(self) -> microscope.TriggerMode:
