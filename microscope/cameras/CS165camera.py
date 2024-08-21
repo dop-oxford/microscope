@@ -479,27 +479,27 @@ class CS165CUCamera(microscope.abc.Camera):
                     f"Camera exposure time has been set to {exposure_time_us} us."
                 )
 
-def _get_binning(self):
-    """Returns the binning of the camera."""
-    if self.simulated:
-        return self.simulated_settings.get('binning', microscope.Binning(1, 1))  # Default binning if not set
-    h = self.camera.binx
-    v = self.camera.biny
-    return microscope.Binning(h, v)
+    def _get_binning(self):
+        """Returns the binning of the camera."""
+        if self.simulated:
+            return self.simulated_settings.get('binning', microscope.Binning(1, 1))  # Default binning if not set
+        h = self.camera.binx
+        v = self.camera.biny
+        return microscope.Binning(h, v)
 
-def _set_binning(self, binning: microscope.Binning):
-    """Sets the binning of the camera."""
-    if self.simulated:
-        self.simulated_settings['binning'] = binning
-    else:
-        self.camera.binx = binning.h
-        self.camera.biny = binning.v
+    def _set_binning(self, binning: microscope.Binning):
+        """Sets the binning of the camera."""
+        if self.simulated:
+            self.simulated_settings['binning'] = binning
+        else:
+            self.camera.binx = binning.h
+            self.camera.biny = binning.v
 
-    # TODO: replace this with add sedtting
-    def set_trigger(self, trigger_mode):
-        """set the trigger mode of the camera."""
-        # TODO: this probably is not right
-        self._trigger_mode = trigger_mode
+        # TODO: replace this with add sedtting
+        def set_trigger(self, trigger_mode):
+            """set the trigger mode of the camera."""
+            # TODO: this probably is not right
+            self._trigger_mode = trigger_mode
 
     @property
     def trigger_mode(self) -> microscope.TriggerMode:
@@ -518,20 +518,26 @@ def _set_binning(self, binning: microscope.Binning):
             roi (tuple): Region of interest (x, y, width, height).
         """
         if self.simulated:
-            return
-        try:
-            self.camera.roi = roi
+            self.simulated_settings['roi'] = roi  # Store ROI in simulated settings
             if self.verbose:
-                print(f"Camera region of interest has been set to {roi}")
-        except Exception as error:
-            print(
-                f"Encountered error: {error}, region of interest could not be set to {roi}."
-            )
-            self.dispose()
+                print(f"Simulated camera region of interest has been set to {roi}")
+        else:
+            try:
+                self.camera.roi = roi
+                if self.verbose:
+                    print(f"Camera region of interest has been set to {roi}")
+            except Exception as error:
+                print(
+                    f"Encountered error: {error}, region of interest could not be set to {roi}."
+                )
+                self.dispose()
 
-    # TODO: This is simulated stuff.
     def _set_gain(self, value):
-        self._gain = value
+        """Sets the gain of the camera."""
+        if self.simulated:
+            self.simulated_settings['gain'] = value  # Store gain in simulated settings
+        else:
+            self._gain = value
 
     def _get_roi(self):
         """Gets camera region of interest.
@@ -540,7 +546,7 @@ def _set_binning(self, binning: microscope.Binning):
             tuple: Region of interest (x, y, width, height).
         """
         if self.simulated:
-            return (0, 0, 512, 512)
+            return self.simulated_settings.get('roi', (0, 0, 512, 512))  # Default simulated ROI
         return self.camera.roi
 
     def set_continuous_mode(self):
@@ -564,6 +570,7 @@ def _set_binning(self, binning: microscope.Binning):
         self, exp_time_us=11000, poll_timeout_ms=1000, verbose=False
     ):
         """Initializes camera acquisition with specified parameters."""
+        # Increment the trigger
         self._triggered += 1
         if self.simulated:
             return
@@ -633,7 +640,7 @@ def _set_binning(self, binning: microscope.Binning):
             else:
                 image = frame.image_buffer
             self._sent += 1
-            self._triggered
+            self._triggered -= 1
             # TODO: This needs to check the image format is just an ndarray as expected.
             return image
 
@@ -767,56 +774,6 @@ def _set_binning(self, binning: microscope.Binning):
         else:
             metadata_dict = None
         return image, metadata_dict
-
-    # --- Getter functions ---
-    def get_camera(self):
-        """Returns the camera instance.
-
-        Returns:
-            TLCamera: Camera instance.
-        """
-        return self.camera
-
-    def get_camera_list(self):
-        """Returns the list of available cameras.
-
-        Returns:
-            list: List of available camera names.
-        """
-        return self.camera_list
-
-    def get_sdk(self):
-        """Returns the SDK instance.
-
-        Returns:
-            TLCameraSDK: SDK instance.
-        """
-        return self.sdk
-
-    def get_camera_name(self):
-        """Returns the camera name.
-
-        Returns:
-            str: Camera name.
-        """
-        return self.camera_name
-
-    def get_mono_to_color_processor(self):
-        """Returns the mono to color processor instance if the camera is color.
-
-        Returns:
-            MonoToColorProcessor: Mono to color processor instance.
-        """
-        return self.mono_to_color_processor
-
-    def get_mono_to_color_sdk(self):
-        """Returns the mono to color SDK instance if the camera is color.
-
-        Returns:
-            MonoToColorProcessorSDK: Mono to color SDK instance.
-        """
-        return self.mono_to_color_sdk
-
 
 """
 ImageAcquisitionThread - Modified from Thorlabs SDK examples
