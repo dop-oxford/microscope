@@ -471,13 +471,14 @@ class CS165CUCamera(microscope.abc.Camera):
 
     def _get_binning(self):
         """Returns the binning of the camera."""
-        # TODO: implement this using get_binx / biny from the SDK.
-        return
+        h = self.camera.binx
+        v = self.camera.biny
+        return microscope.Binning(h, v)
 
-    def _set_binning(self):
+    def _set_binning(self, binning: microscope.Binning):
         """Returns the binning of the camera."""
-        # TODO: implement this using binx / biny setter from the SDK.
-        return
+        self.camera.binx = binning.h
+        self.camera.biny = binning.v
 
     # TODO: replace this with add sedtting
     def set_trigger(self, trigger_mode):
