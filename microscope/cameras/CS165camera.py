@@ -79,14 +79,16 @@ class CS165CUCamera(microscope.abc.Camera):
         self._acquiring = False
         self._triggered = 0
         self._sent = 0
-        if simulated:
-            self.simulated = True
+        self.simulated = simulated
+
+        if self.simulated:
+            self._simulated_settings = {
+                'sensor_shape': (512, 512),
+                'roi': microscope.ROI(0, 0, 512, 512),
+                'exposure_time': 0.1
+            }
             self._image_generator = _ImageGenerator()
-            sensor_shape = (512, 512)
-            self._sensor_shape = sensor_shape
-            self._roi = microscope.ROI(0, 0, *sensor_shape)
-            self._binning = microscope.Binning(1, 1)
-            self._exposure_time = 0.1
+
             self.add_setting(
                 "image pattern",
                 "enum",
@@ -188,10 +190,7 @@ class CS165CUCamera(microscope.abc.Camera):
         :rtype: float
         """
         if self.simulated:
-            # TODO: Do we want to have a dict here "simulated values" so we can access them all in one place?
-            # TODO: Event better, should we have self.simulated_camera which has these methods so we do:
-            # self.simulated_camera.get_cycle_time() and repeat this api for all the simulated methods?
-            return 0.2
+            return self._simulated_settings.get('cycle_time', 0.2)  # Default simulated cycle time
         try:
             return self.camera.frame_rate_control_value
         except Exception as exception:
@@ -205,11 +204,14 @@ class CS165CUCamera(microscope.abc.Camera):
         :param cycle_time_value: The desired cycle time in seconds.
         :type: float
         """
-        try:
-            self.camera.frame_rate_control_value = cycle_time_value
-        except Exception as exception:
-            _logger.error("Could not set cycle time; " + str(exception))
-            raise exception
+        if self.simulated:
+            self._simulated_settings['cycle_time'] = cycle_time_value
+        else:
+            try:
+                self.camera.frame_rate_control_value = cycle_time_value
+            except Exception as exception:
+                _logger.error("Could not set cycle time; " + str(exception))
+                raise exception
 
     # TODO: cant imagine this wont need more work
     def soft_trigger(self):
@@ -260,34 +262,37 @@ class CS165CUCamera(microscope.abc.Camera):
         if self.verbose:
             print(f"Camera name has been set to {camera_name}.")
 
-    # NOTE: This has been renamed from get_sensor_pixel_size
     def _get_sensor_shape(self):
         """Returns sensor dimensions in pixels.
 
         Returns:
             list: Sensor dimensions [height, width] in pixels.
         """
+        if self.simulated:
+            return self.simulated_settings.get('sensor_shape', [512, 512])  # Default simulated sensor shape
         return [
             self.camera.image_height_pixels,
             self.camera.image_width_pixels,
         ]
-
+    
     def get_pixel_size(self):
-        """Returns pixel dimensions in um.
+        """Returns pixel dimensions in micrometers (um).
 
         Returns:
-            list: Pixel dimensions [height, width] in um.
+            list: Pixel dimensions [height, width] in micrometers (um).
         """
+        if self.simulated:
+            return self.simulated_settings.get('pixel_size', [6.5, 6.5])  # Default simulated pixel size in um
         return [
             self.camera.sensor_pixel_height_um,
             self.camera.sensor_pixel_width_um,
         ]
 
     def get_sensor_size_um(self):
-        """Returns sensor dimensions in um.
+        """Returns sensor dimensions in micrometers (um).
 
         Returns:
-            list: Sensor dimensions [height, width] in um.
+            list: Sensor dimensions [height, width] in micrometers (um).
         """
         return (
             np.array(self._get_sensor_shape())
@@ -438,6 +443,8 @@ class CS165CUCamera(microscope.abc.Camera):
 
     def get_exposure_time(self) -> float:
         """Get exposure time in seconds."""
+        if self.simulated:
+            return self.simulated_settings.get('exposure_time', 0.1)  # Default simulated exposure time in seconds
         return self.camera.exposure_time_us * 1e-6
 
     def set_exposure_time(self, exposure_time):
@@ -446,7 +453,10 @@ class CS165CUCamera(microscope.abc.Camera):
         Args:
             exposure_time (float): Camera exposure time in seconds.
         """
-        self.set_exposure_time_us(exposure_time * 1e6)
+        if self.simulated:
+            self.simulated_settings['exposure_time'] = exposure_time
+        else:
+            self.set_exposure_time_us(exposure_time * 1e6)
 
     def set_exposure_time_us(self, exposure_time_us):
         """Sets camera exposure time in microseconds.
@@ -455,35 +465,40 @@ class CS165CUCamera(microscope.abc.Camera):
             exposure_time_us (int): Camera exposure time in us.
         """
         if self.simulated:
-            # TODO: Whatever method we use for getter/setter of simulated stuff do here.
-            return
-        try:
-            self.camera.exposure_time_us = exposure_time_us
-        except Exception as error:
-            print(
-                f"Encountered error: {error}, exposure time us could not be set to {exposure_time_us} us."
-            )
-            self.dispose()
-        if self.verbose:
-            print(
-                f"Camera exposure time has been set to {exposure_time_us} us."
-            )
+            self.simulated_settings['exposure_time_us'] = exposure_time_us
+        else:
+            try:
+                self.camera.exposure_time_us = exposure_time_us
+            except Exception as error:
+                print(
+                    f"Encountered error: {error}, exposure time us could not be set to {exposure_time_us} us."
+                )
+                self.dispose()
+            if self.verbose:
+                print(
+                    f"Camera exposure time has been set to {exposure_time_us} us."
+                )
 
-    def _get_binning(self):
-        """Returns the binning of the camera."""
-        h = self.camera.binx
-        v = self.camera.biny
-        return microscope.Binning(h, v)
+def _get_binning(self):
+    """Returns the binning of the camera."""
+    if self.simulated:
+        return self.simulated_settings.get('binning', microscope.Binning(1, 1))  # Default binning if not set
+    h = self.camera.binx
+    v = self.camera.biny
+    return microscope.Binning(h, v)
 
-    def _set_binning(self, binning: microscope.Binning):
-        """Returns the binning of the camera."""
+def _set_binning(self, binning: microscope.Binning):
+    """Sets the binning of the camera."""
+    if self.simulated:
+        self.simulated_settings['binning'] = binning
+    else:
         self.camera.binx = binning.h
         self.camera.biny = binning.v
 
     # TODO: replace this with add sedtting
     def set_trigger(self, trigger_mode):
         """set the trigger mode of the camera."""
-        # TODO: this probabely is not right
+        # TODO: this probably is not right
         self._trigger_mode = trigger_mode
 
     @property
