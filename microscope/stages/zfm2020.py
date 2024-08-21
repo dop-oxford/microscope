@@ -21,7 +21,7 @@ class ZFM2020Stage(BRamanZStage):
     def __init__(self, *args, **kwargs):
         # TODO: Currently I am passing in nonsense to the conn argument of the super class,
         # here we need a way to define what controller instance we are using inside the device_server call.
-        super().__init__("Test_controller")
+        super().__init__("Test_controller", **kwargs)
 
         if len(args) == 0:
             # NOTE(ADW): An approach that might work here is the init by kwargs method here if we do not pass a config but this may turn out to be unnecessary.

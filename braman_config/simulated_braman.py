@@ -24,7 +24,8 @@ DEVICES = [
                 "reverse": True,
                 "verbose": True,
                 "very_verbose": True,
-                "unit": "mm"
+                "unit": "mm",
+                "simulated": True,
             }
     ),
     device(
@@ -36,7 +37,8 @@ DEVICES = [
             "channel": 1,
             "stage_name": "MLS2032",
             "reverse": True,
-            "unit": "mm"
+            "unit": "mm",
+            "simulated": True,
         }
     ),
     device(

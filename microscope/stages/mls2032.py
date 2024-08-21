@@ -4,7 +4,7 @@ from microscope.stages.generic import BRamanXYStage
 class MLS2032Stage(BRamanXYStage):
     def __init__(self, *args, **kwargs):
         # TODO: Add the controller as a kwarg.
-        super().__init__("test_controller")
+        super().__init__("test_controller", **kwargs)
         self.initialize()
 
     # NOTE: It makes sense from Alvaros comments that we call self.conn in this class.

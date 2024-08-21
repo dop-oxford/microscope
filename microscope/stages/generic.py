@@ -26,6 +26,7 @@ class _GenericStageAxis(microscope.abc.StageAxis):
         name,
         simulated=False,
         limits=[-10000, 10000],
+        **kwargs,
     ):
         super().__init__()
         self._position = limits[0] + (limits[1] - limits[0]) / 2
@@ -68,7 +69,7 @@ class _GenericStageAxis(microscope.abc.StageAxis):
 
 
 class BRamanZStage(microscope.abc.Stage):
-    # TODO: Ask alvaro, stage versus stageaxis , stageaxis seems to fit the fact it is 1 axis as opposed to the x_y stage
+    # TODO: Ask alvaro, stage versus stageaxis, stageaxis seems to fit the fact it is 1 axis as opposed to the x_y stage
     # I suspect that it should be a stage with 1 stageaxis but lets see.
 
     # NOTE(ADW): I think stage is correct, not axis, we shouldnt use axis directly.
@@ -82,7 +83,7 @@ class BRamanZStage(microscope.abc.Stage):
     """
 
     # TODO: we want to pass in the controller for the stage. i.e. what you do is pass the controller and the channel and that defines how this is moved by accessing self.conn
-    def __init__(self, controller: microscope.abc.Controller, **kwargs):
+    def __init__(self, controller: microscope.abc.Controller, simulated=False, **kwargs):
         """
         Initializes a ZStageController object.
 
@@ -93,12 +94,12 @@ class BRamanZStage(microscope.abc.Stage):
         # self.unit = self.validate_unit(unit)
         # self.retract_pos_um = self._get_initial_retract_pos_um()
         # self.stage_name = stage_name
-        super().__init__(**kwargs)
+        super().__init__()
         self.controller = controller
         # TODO: This needs to be changed to a specific subclass of the zstage axis, if we different manufacturers?
         # OR can we make this abc and the _BRamanZStageAxis abstract enough that the implementation in ZFM2020 is all that matters.
         self._axes = {
-            "Z": _GenericStageAxis(self.controller, "Z", limits=[-5000, 5000])
+            "Z": _GenericStageAxis(self.controller, "Z", limits=[-5000, 5000], simulated=simulated),
         }
 
         self.homed = False
@@ -143,7 +144,7 @@ class BRamanZStage(microscope.abc.Stage):
 
 class BRamanXYStage(microscope.abc.Stage):
     # TODO: same as above we pass the specific instance of the controller? and the channels which control these axes?
-    def __init__(self, controller: microscope.abc.Controller, name="XY Stage"):
+    def __init__(self, controller: microscope.abc.Controller, name="XY Stage", simulated=False, **kwargs):
         self.name = name
         # we make 2 axes, x and y
         # self.unit = self.validate_unit(unit)
@@ -154,8 +155,8 @@ class BRamanXYStage(microscope.abc.Stage):
         # TODO: I am reusing the _BRamanZStageAxis class here, but this should be a different
         # class for the XY stage OR it should be named _BRamanStageAxis, lean towards the latter.
         self._axes = {
-            "X": _GenericStageAxis(self.controller, "X", limits=[4000, 25000]),
-            "Y": _GenericStageAxis(self.controller, "Y", limits=[0, 12500]),
+            "X": _GenericStageAxis(self.controller, "X", limits=[4000, 25000], simulated=simulated),
+            "Y": _GenericStageAxis(self.controller, "Y", limits=[0, 12500], simulated=simulated),
         }
 
     # repeat the same method overloads as zstage.
