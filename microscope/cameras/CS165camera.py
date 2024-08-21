@@ -33,7 +33,7 @@ _logger = logging.getLogger(__name__)
 # TODO: This needs serious investigation, I am just using another piece of code but i cant find similar code in SDK
 # NOTE(ADW): The rising edge seems to be trigger polarity on the SDK and the TLCAMERA.operation_mode is trigger
 # mode, se we should be passing these tuples to those setters respectively.
-SDK3_STRING_TO_TRIGGER = {
+STRING_TO_TRIGGER = {
     "external": (
         microscope.TriggerType.RISING_EDGE,
         microscope.TriggerMode.ONCE,
@@ -489,12 +489,12 @@ class CS165CUCamera(microscope.abc.Camera):
     @property
     def trigger_mode(self) -> microscope.TriggerMode:
         trigger_string = self._trigger_mode.lower()
-        return SDK3_STRING_TO_TRIGGER[trigger_string][1]
+        return STRING_TO_TRIGGER[trigger_string][1]
 
     @property
     def trigger_type(self):
         trigger_string = self._trigger_mode.lower()
-        return SDK3_STRING_TO_TRIGGER[trigger_string][0]
+        return STRING_TO_TRIGGER[trigger_string][0]
 
     def _set_roi(self, roi):
         """Sets camera region of interest.
