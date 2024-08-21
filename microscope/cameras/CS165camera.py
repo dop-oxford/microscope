@@ -49,56 +49,6 @@ SDK3_STRING_TO_TRIGGER = {
 class CS165CUCamera(microscope.abc.Camera):
     """
     Class to control the Thorlabs CS165CU Camera
-
-    Attributes:
-        verbose (bool): If True, info is printed in terminal
-        very_verbose (bool): If True, more info is printed in terminal
-        sdk (TLCameraSDK): SDK instance
-        camera_name (str): Name of camera
-        camera_list (list): List of available cameras
-        camera (TLCamera): Camera instance
-        _is_color (bool): Whether the camera is color
-        mono_to_color_sdk (MonoToColorProcessorSDK): Mono to color SDK instance (if camera is color)
-        mono_to_color_processor (MonoToColorProcessor): Mono to color processor instance (if camera is color)
-        acq_initialized (bool): Whether acquisition has been initialized
-        metadata (dict): Camera metadata
-
-    Methods:
-        print_info(): Prints camera information to terminal
-        dispose(): Cleans up SDK and camera resources
-        rename_camera(camera_name): Renames the camera
-        get_sensor_pixel_size(): Returns sensor dimensions in pixels
-        get_pixel_size(): Returns pixel dimensions in um
-        get_sensor_size_um(): Returns sensor dimensions in um
-        set_metadata(): Sets camera metadata
-        get_metadata(): Returns camera metadata
-        initialize_mono_to_color_processor(): Initializes mono to color processor (if camera is color)
-        set_color_processor_gains(RGB): Sets color processor RGB gains
-        set_color_processor_properties(color_space, output_format, verbose): Sets color processor properties
-        get_color_processor_gains(verbose): Gets color processor RGB gains
-        get_color_processor_properties(verbose): Gets color processor properties
-        set_image_poll_timeout_ms(image_poll_timeout_ms): Sets image poll timeout in ms
-        set_frames_per_trigger_zero_for_unlimited(frames_per_trigger_zero_for_unlimited): Sets frames per trigger
-        set_exposure_time_us(exposure_time_us): Sets camera exposure time in microseconds
-        set_roi(roi): Sets camera region of interest
-        get_roi(): Gets camera region of interest
-        set_continuous_mode(): Sets camera to continuous mode
-        initialize_acquisition(exp_time_us, poll_timeout_ms, verbose): Initializes camera acquisition
-        get_frame(disarm): Gets a frame from the camera
-        get_image(rescale, target_bpp): Gets an image from the camera
-        get_raw_color_image(transform_key, reshape): Gets a raw color image from the camera
-        get_color_image(transform_key): Gets a color PIL image from the camera
-        save_color_image(img_name, img_format, folder_path, color_transformation, metadata_dict): Saves a color image
-        read_color_image(img_path): Reads a color image and its metadata
-        get_camera(): Returns camera instance
-        get_camera_list(): Returns list of available cameras
-        get_sdk(): Returns SDK instance
-        get_camera_name(): Returns camera name
-        get_mono_to_color_processor(): Returns mono to color processor instance (if camera is color)
-        get_mono_to_color_sdk(): Returns mono to color SDK instance (if camera is color)
-        live_image(root, dispose): Starts live image view
-        camera_GUI(root, dispose): Starts camera GUI
-
     """
 
     def __init__(
@@ -229,13 +179,37 @@ class CS165CUCamera(microscope.abc.Camera):
         _logger.info("Acquisition enabled.")
         return True
 
-    # TODO: This is placeholder code
-    def get_cycle_time(self) -> float:
-        return 1.0
-
-    # TODO: This is placeholder code, these methods must exist on the sdk
-    def get_exposure_time(self) -> float:
-        return 0.1
+    # TODO: This is placeholder code:: Ask alvaro if the frame_rate_control_value is this cycle time
+    def get_cycle_time(self):
+        """
+        Get the current cycle time from the camera.
+        
+        :return: The current cycle time in seconds.
+        :rtype: float
+        """
+        if self.simulated:
+            # TODO: Do we want to have a dict here "simulated values" so we can access them all in one place?
+            # TODO: Event better, should we have self.simulated_camera which has these methods so we do:
+            # self.simulated_camera.get_cycle_time() and repeat this api for all the simulated methods?
+            return 0.2
+        try:
+            return self.camera.frame_rate_control_value
+        except Exception as exception:
+            _logger.error("Could not get cycle time; " + str(exception))
+            raise exception
+        
+    def set_cycle_time(self, cycle_time_value):
+        """
+        Set the cycle time for the camera.
+        
+        :param cycle_time_value: The desired cycle time in seconds.
+        :type: float
+        """
+        try:
+            self.camera.frame_rate_control_value = cycle_time_value
+        except Exception as exception:
+            _logger.error("Could not set cycle time; " + str(exception))
+            raise exception
 
     # TODO: cant imagine this wont need more work
     def soft_trigger(self):
@@ -316,14 +290,14 @@ class CS165CUCamera(microscope.abc.Camera):
             list: Sensor dimensions [height, width] in um.
         """
         return (
-            np.array(self.get_sensor_pixel_size())
+            np.array(self._get_sensor_shape())
             * np.array(self.get_pixel_size())
         ).tolist()
 
     def set_metadata(self):
         """Sets camera metadata."""
         self.metadata = dict(
-            Camera_Sensor_Size_HxW=self.get_sensor_pixel_size(),
+            Camera_Sensor_Size_HxW=self._get_sensor_shape(),
             Camera_Pixel_Size_HxW=self.get_pixel_size(),
         )
 
@@ -462,6 +436,10 @@ class CS165CUCamera(microscope.abc.Camera):
                 f"Camera number of frames generated per software or hardware trigger have been set to {frames_per_trigger_zero_for_unlimited}."
             )
 
+    def get_exposure_time(self) -> float:
+        """Get exposure time in seconds."""
+        return self.camera.exposure_time_us * 1e-6
+
     def set_exposure_time(self, exposure_time):
         """Sets camera exposure time in seconds.
 
@@ -477,6 +455,7 @@ class CS165CUCamera(microscope.abc.Camera):
             exposure_time_us (int): Camera exposure time in us.
         """
         if self.simulated:
+            # TODO: Whatever method we use for getter/setter of simulated stuff do here.
             return
         try:
             self.camera.exposure_time_us = exposure_time_us
