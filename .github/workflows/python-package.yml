@@ -33,4 +33,4 @@ jobs:
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=79 --statistics
     - name: Run unittest
       run: |
-          python -m unittest discover -s testsuite
+          python -m unittest discover -s microscope/testsuite
