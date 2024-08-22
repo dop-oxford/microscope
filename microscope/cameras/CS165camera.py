@@ -70,10 +70,14 @@ class CS165CUCamera(microscope.abc.Camera):
             lambda: (0, 8192),
         )
 
-        # TODO: this obviously needs a proper solution:
-        os.add_dll_directory(
-            "C:\Program Files\Thorlabs\Scientific Imaging\ThorCam"
-        )
+        try:
+            # TODO: this obviously needs a proper solution:
+            os.add_dll_directory(
+                "C:\Program Files\Thorlabs\Scientific Imaging\ThorCam"
+            )
+        except:
+            pass
+        
         # TODO: we can't hard set the trigger mode really
         self._trigger_mode = "software"
         self._acquiring = False
