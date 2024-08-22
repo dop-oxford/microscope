@@ -474,20 +474,32 @@ class BBD30XController:
         return None
 
     def _make_channel_iterator(self, channel):
-        """Make an iterator from the channel(s).
+        """
+        Make an iterator from the channel(s).
 
-        Args:
-            channel (any): Single channel or list of channels.
+        Parameters
+        ----------
+        channel : list, tuple or str
+            Single channel or list of channels.
 
-        Returns:
-            tuple: Tuple of channels to iterate over.
+        Returns
+        -------
+        tuple
+            Tuple of channels over which to iterate.
         """
         if not isinstance(channel, (list, tuple)):
             channel = (channel,)
-        
-        assert len(channel) == len(set(channel)), f"Duplicate channel name/number: {channel}"  # Check that no name/number is duplicate
-        assert all(isinstance(n, int) for n in channel) or all(isinstance(n, str) for n in channel), "The list of channels is not integers or strings."  # Test if channels are given in numbers or names
-        
+
+        # Check that no names/numbers are duplicate
+        assert len(channel) == len(set(channel)), (
+            f'Duplicate channel name/number: {channel}'
+        )
+        # Test if channels are given in numbers or names
+        assert all(isinstance(n, int) for n in channel) or \
+            all(isinstance(n, str) for n in channel), (
+                'The list of channels is not integers or strings.'
+            )
+
         return tuple(channel)
 
 
