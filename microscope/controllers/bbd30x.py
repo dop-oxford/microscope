@@ -160,34 +160,36 @@ class BBD30XController:
 
     def print_device_info(self):
         """Print the device information."""
-        print("------------------------")
-        print(f"DEVICE: {self.name}")
-        print(f"Device Description: {self.device_info.Description}")
-        print(f"Device Serial No: {self.device_info.SerialNumber}")
-        print(f"Device Type: {self.device_info.DeviceType}")
-        print(f"Device Hardware Version: {self.device_info.HardwareVersion}")
-        print(f"Device Firmware Version: {self.device_info.FirmwareVersion}")
-        print("------------------------")
-
+        print('------------------------')
+        print(f'DEVICE: {self.name}')
+        print(f'Device Description: {self.device_info.Description}')
+        print(f'Device Serial No: {self.device_info.SerialNumber}')
+        print(f'Device Type: {self.device_info.DeviceType}')
+        print(f'Device Hardware Version: {self.device_info.HardwareVersion}')
+        print(f'Device Firmware Version: {self.device_info.FirmwareVersion}')
+        print('------------------------')
 
     def print_channel_info(self, channel):
-        """Print the channel information.
+        """
+        Print the channel information.
 
-        Args:
-            channel (str or int): Channel name or number.
+        Parameters
+        ----------
+        channel : str or int
+            Channel name or number.
         """
         self._make_channel_iterator(channel)
         for chan in channel:
             chan_idx = self._get_channel_idx(chan)
             channel_info = self.channels[chan_idx].GetDeviceInfo()
-            print(f"Channel {chan} Info:")
-            print(f"Class: {self.channels[chan_idx]}")
-            print(f"Channel Description: {channel_info.Description}")
-            print(f"Channel Serial No: {channel_info.SerialNumber}")
-            print(f"Channel Type: {channel_info.DeviceType}")
-            print(f"Channel Hardware Version: {channel_info.HardwareVersion}")
-            print(f"Channel Firmware Version: {channel_info.FirmwareVersion}")
-            print("------------------------")
+            print(f'Channel {chan} Info:')
+            print(f'Class: {self.channels[chan_idx]}')
+            print(f'Channel Description: {channel_info.Description}')
+            print(f'Channel Serial No: {channel_info.SerialNumber}')
+            print(f'Channel Type: {channel_info.DeviceType}')
+            print(f'Channel Hardware Version: {channel_info.HardwareVersion}')
+            print(f'Channel Firmware Version: {channel_info.FirmwareVersion}')
+            print('------------------------')
         return None
 
     def print_velocity_params(self, channel=['X', 'Y']):
