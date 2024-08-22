@@ -1,5 +1,5 @@
 """
-Controller for the thorlabs BBD30X Brushless Motor Controllers.
+Controller for the Thorlabs BBD30X Brushless Motor Controllers.
 
 Author: Alvaro Fernandez Galiana (alvaro.fernandezgaliana@gmail.com)
 Date: 2024-06-27
@@ -13,132 +13,145 @@ Notes:
       the channel_name convention, and not the idx.
     - Check Decimal to Float conversion
 """
-
-import os
+from collections.abc import Iterable
 import time
-import clr
-import ctypes
-import numpy as np
-import json
-from collections.abc import Iterable
 
-
-from ctypes import *
-
-clr.AddReference("C:\\Program Files\\Thorlabs\\Kinesis\\Thorlabs.MotionControl.DeviceManagerCLI.dll")
-clr.AddReference("C:\\Program Files\\Thorlabs\\Kinesis\\Thorlabs.MotionControl.GenericMotorCLI.dll")
-clr.AddReference("C:\\Program Files\\Thorlabs\\Kinesis\\ThorLabs.MotionControl.Benchtop.BrushlessMotorCLI.dll")
-
-from Thorlabs.MotionControl.DeviceManagerCLI import *
-from Thorlabs.MotionControl.GenericMotorCLI import *
-from Thorlabs.MotionControl.Benchtop.BrushlessMotorCLI import *
-from System import Decimal  # necessary for real world units
-#from decimal import * # necessary for real world units
-from collections.abc import Iterable
 
 class BBD30XController:
-    def __init__(self, config):
+
+    def __init__(
+        self, serial_no='103251384', name='BBD302', channel_names=('X', 'Y'),
+        reverse=(False, False), simulated=False, verbose=True,
+        very_verbose=False
+    ):
         """
-        Initializes the BBD30XController.
+        Initialise the BBD30X controller.
 
-        Args:
-            config (str or dict): Configuration for the controller. It can be a path to a config file (JSON) or a dictionary.
+        Parameters
+        ----------
+        serial_no : str, default '103251384'
+            Serial number for Benchtop Brushless Motor.
+        name : str, default 'BBD302'
+            Name of the controller.
+        channel_names : tuple of (str,), default ('X', 'Y')
+            Channel names.
+        reverse : tuple of (bool,), default (False, False)
+            If channels are in reverse direction.
+        simulated : bool, default False
+            If the controller is being simulated in silico in lieu of real
+            hardware being used.
+        verbose : bool, default True
+            If general information is printed to screen.
+        very_verbose : bool, default False
+            If detailed information is printed to screen.
         """
-        if isinstance(config, str):
-            with open(config, 'r') as f:
-                config = json.load(f)
-        elif config is None:
-            raise ValueError("No configuration provided for the controller.")
-        else:
-            assert isinstance(config, dict), "Configuration must be a dictionary or a path to a JSON file."
+        self.serial_no = serial_no
+        self.name = name
+        self.verbose = verbose
+        self.very_verbose = very_verbose
+        self.simulated = simulated
+        self.channel_names = channel_names
+        self.reverse = reverse
 
-        self.serialNo = config.get('serialNumber', None) # Serial number for Benchtop Brushless Motor
-        if not self.serialNo:
-            raise ValueError("Serial number must be provided.")
-        self.name = config.get('name', 'BBD30X')  # Name of the controller
-        self.verbose = config.get('verbose', True)  # Whether to print or not info on screen
-        self.very_verbose = config.get('very_verbose', False)  # Even more info
-        self.isSim = config.get('isSim', False)  # If we are running a simulation on Kinesis Simulator
-        self.channel_names = config.get('channel_names', (None,) * 3)  # Tuple of channel names
-        self.reverse = config.get('reverse', (False,) * 3)  # Whether some of the channels are in reverse direction
+        # 1-indexed array of channel numbers
+        self.channel_nums = range(1, len(self.channel_names) + 1)
+        # Links name to channel number
+        self.channel_nums_dict = \
+            dict(zip(self.channel_names, self.channel_nums))
+        # Tuple of the actual channels
+        self.channels = (None,) * len(self.channel_names)
+        # Create dictionary with channels names and channels
+        self.channel_dict = dict(zip(self.channel_names, self.channels))
 
-        self.channel_nums = range(1, len(self.channel_names) + 1)  # Array of channel numbers starting at 1
-        self.channel_nums_dict = dict(zip(self.channel_names, self.channel_nums))  # Links name to channel number
-        self.channels = (None,) * len(self.channel_names)  # Tuple of the actual channels
-        self.channel_dict = dict(zip(self.channel_names, self.channels))  # Create dictionary with channels names and channels
-
+        # Check that there are enough objects in the `reverse` tuple
         assert len(self.reverse) >= len(self.channel_names), (
-            f"More channels ({len(self.channel_names)}) than reverse conditions ({len(self.reverse)})"
-        )  # Check that there are enough reverse
-        assert len(self.channel_names) == len(set(self.channel_names)), (
-            f"Duplicate channel names: {self.channel_names}"
-        )  # Check that no name is duplicate
-
-        # Initialize simulation
-        if self.isSim:
-            SimulationManager.Instance.InitializeSimulations()
-
-        # Build list of connected devices
-        try:
-            DeviceManagerCLI.BuildDeviceList()
-        except Exception as e:
-            print(f'Exception raised building device list: {e}')
-
-        #  Get available Benchtop Brushless Motors and check our serial number is correct
-        self.deviceList = DeviceManagerCLI.GetDeviceList()  # all devices list
-        self.deviceListBBM = DeviceManagerCLI.GetDeviceList(BenchtopBrushlessMotor.DevicePrefix103)  # 103 is the device prefix for benchtop brushless motor
-        if self.very_verbose:
-            print("------------------------")
-            print("Device List:")
-            print(self.deviceList)
-            print("Brushless Motor Device List:")
-            print(self.deviceListBBM)
-            print("------------------------")
-
-        # Check/assign serial number
-        if self.deviceListBBM:  # Check if not empty
-            if self.serialNo:
-                if self.serialNo in self.deviceListBBM:
-                    pass
-                else:
-                    raise ValueError(f"Serial number {self.serialNo} is not in the list of devices available: {self.deviceListBBM}")
-
-            else:
-                self.serialNo = self.deviceListBBM[0]  # Take first device on list
-                print(f"The device serial number has been selected from the list and is {self.serialNo}")
-        else:
-            raise ValueError("There are no devices connected")
-
-        # Create the device and check type
-        try:
-            if self.verbose:
-                print(f"Opening device...")
-            self.device = BenchtopBrushlessMotor.CreateBenchtopBrushlessMotor(self.serialNo)
-            self.device.Connect(self.serialNo)  # Connect to device
-            time.sleep(0.25)  # wait statements are important to allow settings to be sent to the device
-            if self.verbose:
-                print("------------------------")
-                print(f"Device class: {self.device}")
-                print("------------------------")
-
-            # Get and print device info
-            self.device_info = self.device.GetDeviceInfo()
-            if self.verbose:
-                self.print_device_info()
-        except Exception as e:
-            print(f'Exception connecting to device serial number {self.serialNo}. Exception: {e}')
-
-        # Get motherboard configurations
-        self.mb_config = self.device.GetMotherboardConfiguration(
-            self.serialNo, DeviceConfiguration.DeviceSettingsUseOptionType.UseDeviceSettings
+            f'More channels ({len(self.channel_names)}) than reverse '
+            f'conditions ({len(self.reverse)})'
         )
 
-        # Get synchronous controller:
-        self.synch_cont = self.device.GetSyncController()
-        # Synchronous controller, for use, check https://github.com/Thorlabs/Motion_Control_Examples/blob/main/C%23/Benchtop/BBD30X_Synch_Move/Program.cs
+        # Check that no name is duplicated
+        assert len(self.channel_names) == len(set(self.channel_names)), (
+            f'Duplicate channel names: {self.channel_names}'
+        )
 
-        # # Check if bay 1 exists:
-        # if not self.device.IsBayValid(1): raise ValueError(f"Bay 1 of the device does not exist")
+        if not self.simulated:
+            # Build list of connected devices
+            DeviceManagerCLI.BuildDeviceList()
+            # Get all available devices
+            self.device_list = DeviceManagerCLI.GetDeviceList()
+            # Get available Benchtop Brushless Motors
+            self.device_list_BBM = DeviceManagerCLI.GetDeviceList(
+                BenchtopBrushlessMotor.DevicePrefix103
+            )
+
+            if self.very_verbose:
+                print('------------------------')
+                print('Device List:')
+                print(self.device_list)
+                print('Brushless Motor Device List:')
+                print(self.device_list_BBM)
+                print('------------------------')
+
+            # Check/assign serial number
+            if self.device_list_BBM:
+                if self.serial_no:
+                    if self.serial_no in self.device_list_BBM:
+                        pass
+                    else:
+                        raise ValueError(
+                            f'Serial number {self.serial_no} is not in the '
+                            'list of devices available:'
+                            f'{self.device_list_BBM}'
+                        )
+                else:
+                    self.serial_no = self.device_list_BBM[0]
+                    print(
+                        f'The device serial number has been selected from the '
+                        f'list and is {self.serial_no}'
+                    )
+            else:
+                raise ValueError('There are no devices connected')
+
+            # Create the device and check type
+            try:
+                if self.verbose:
+                    print('Opening device...')
+                self.device = \
+                    BenchtopBrushlessMotor.CreateBenchtopBrushlessMotor(
+                    self.serialNo
+                )
+                self.device.Connect(self.serialNo)
+
+                # Wait statements are important to allow settings to be sent
+                # to the device
+                time.sleep(0.25)
+
+                if self.verbose:
+                    print('------------------------')
+                    print(f'Device class: {self.device}')
+                    print('------------------------')
+
+                # Get and print device info
+                self.device_info = self.device.GetDeviceInfo()
+                if self.verbose:
+                    self.print_device_info()
+            except Exception as e:
+                print(
+                    'Exception connecting to device serial number '
+                    f'{self.serial_no}. Exception: {e}'
+                )
+
+            # # Get motherboard configurations
+            # self.mb_config = self.device.GetMotherboardConfiguration(
+            #     self.serial_no,
+            #     DeviceConfiguration.DeviceSettingsUseOptionType.
+            #     UseDeviceSettings
+            # )
+
+            # Get synchronous controller
+            # See https://github.com/Thorlabs/Motion_Control_Examples/blob/
+            # main/C%23/Benchtop/BBD30X_Synch_Move/Program.cs
+            self.synch_cont = self.device.GetSyncController()
 
         # Get channels
         self.get_channels(verbose=self.very_verbose)
@@ -193,8 +206,8 @@ class BBD30XController:
             print(f"MinVelocity: {velParams.MinVelocity}")
             print("------------------------")
         return None
-    
-        
+
+
     def _decimal_to_float(self, decimal):
         """Convert Decimal to float.
 
@@ -877,18 +890,14 @@ class BBD30XController:
 
 
 if __name__ == '__main__':
-    config = { 
-            'serialNumber':"103251384", 
-            'name':'BBD302', 
-            'channel_names':('X','Y'),
-            'reverse':2*(False,), 
-            'verbose':True, 
-            'very_verbose':True, 
-            'isSim':False
-    }
-    XY_controller = BBD30XController(config) # If True, the code is to run a Kinesis simulation
-    XY_controller.test_basic()
-    #XY_controller.moveTo(np.array([53.452546,30.3564564]), max_vel = 10, acc = 200, verbose = True)
-    XY_controller.finish(verbose=True)
+    conn = BBD30XController(simulated=True, verbose=True, very_verbose=True)
 
+    # # Test an alternative configuration
+    # name = 'BBD30X'
+    # conn = BBD30XController(
+    #     name=name, simulated=True, verbose=True, very_verbose=True
+    # )
 
+    # conn.test_basic()
+    # conn.moveTo([53.452546, 30.3564564], max_vel=10, acc=200, verbose=True)
+    # conn.finish(verbose=True)
