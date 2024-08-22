@@ -16,6 +16,66 @@ Notes:
 from collections.abc import Iterable
 import time
 
+class SimulatedDeviceInfo:
+    def __init__(
+        self, description, serial_no, device_type, hardware_version,
+        firmware_version
+    ):
+        self.Description = description
+        self.SerialNumber = serial_no
+        self.DeviceType = device_type
+        self.HardwareVersion = hardware_version
+        self.FirmwareVersion = firmware_version
+
+
+class SimulatedChannel:
+    def __init__(
+        self, description, serial_no, device_type, hardware_version,
+        firmware_version
+    ):
+        self.Description = description
+        self.SerialNumber = serial_no
+        self.DeviceType = device_type
+        self.HardwareVersion = hardware_version
+        self.FirmwareVersion = firmware_version
+
+    def GetDeviceInfo(self):
+        return SimulatedDeviceInfo(
+            description=self.Description,
+            serial_no=self.SerialNumber,
+            device_type=self.DeviceType,
+            hardware_version=self.HardwareVersion,
+            firmware_version=self.FirmwareVersion
+        )
+
+    def IsSettingsInitialized(self):
+        return True
+
+
+class SimulatedDevice:
+    def __init__(self):
+        self.channels = [
+            SimulatedChannel(
+                description='Simulated Channel 1',
+                serial_no='1',
+                device_type='Simulated Channel',
+                hardware_version='Simulated Hardware',
+                firmware_version='Simulated Firmware'
+            ),
+            SimulatedChannel(
+                description='Simulated Channel 2',
+                serial_no='2',
+                device_type='Simulated Channel',
+                hardware_version='Simulated Hardware',
+                firmware_version='Simulated Firmware'
+            ),
+        ]
+
+    def GetChannel(self, num):
+        # The channel 'num' is its index plus 1
+        idx = num - 1
+        return self.channels[idx]
+
 
 class BBD30XController:
 
@@ -74,7 +134,9 @@ class BBD30XController:
             f'Duplicate channel names: {self.channel_names}'
         )
 
-        if not self.simulated:
+        if self.simulated:
+            self.device = SimulatedDevice()
+        else:
             # Build list of connected devices
             DeviceManagerCLI.BuildDeviceList()
             # Get all available devices
@@ -264,11 +326,15 @@ class BBD30XController:
         return None
 
     def get_channel_single(self, channel=None, verbose=False):
-        """Get a single channel.
+        """
+        Get a single channel.
 
-        Args:
-            channel (str or int, optional): Channel name or number. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+        Parameters
+        ----------
+        channel : str, int or None, default None
+            Channel name or number.
+        verbose : bool, default False
+            Whether to print additional information.
         """
         chan_idx = self._get_channel_idx(channel)
         if isinstance(channel, int):
@@ -276,24 +342,31 @@ class BBD30XController:
         elif isinstance(channel, str):
             chan_num = self.channel_nums_dict[channel]
         else:
-            raise Exception(f"The channel {channel} is not integer or string, the type is {type(channel)}.")
+            raise Exception(
+                f'The channel {channel} is not an integer or string, the type '
+                f'is {type(channel)}.'
+            )
         try:
             self.channels = list(self.channels)
             self.channels[chan_idx] = self.device.GetChannel(chan_num)
             self.channels = tuple(self.channels)
         except Exception as e:
             print(f'Exception connecting to channel {channel}. Exception: {e}')
-        self.channel_dict = dict(zip(self.channel_names, self.channels))  # Create dictionary with channels names and channels
+        # Create dictionary with channels names and channels
+        self.channel_dict = dict(zip(self.channel_names, self.channels))
         if verbose:
-            print(f"Channel {channel} information:")
+            print(f'Channel {channel} information:')
             self.print_channel_info(channel)
         # Ensure that the channel settings have been initialized
         if not self.channels[chan_idx].IsSettingsInitialized():
-            self.channels[chan_idx].WaitForSettingsInitialized(10000)  # 10 second timeout
-            assert self.channels[chan_idx].IsSettingsInitialized() is True, print(f"Channel {channel} has not been initialized")
+            # 10 second timeout
+            self.channels[chan_idx].WaitForSettingsInitialized(10000)
+            assert self.channels[chan_idx].IsSettingsInitialized() is True, (
+                f'Channel {channel} has not been initialized'
+            )
         if verbose:
-            print(f"Channel {channel} was successfully gotten")
-            print("------------------------")
+            print(f'Channel {channel} was successfully gotten')
+            print('------------------------')
         return None
 
     def load_config_channels(self, channel=None, verbose=False):
