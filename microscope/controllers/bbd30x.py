@@ -240,20 +240,25 @@ class BBD30XController:
         return chan_idx
 
     def get_channels(self, channel=None, verbose=False):
-        """Get the specified channels.
+        """
+        Get the specified channels.
 
-        Args:
-            channel (list or None, optional): List of channel names or numbers. If None, gets all channels. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+        Parameters
+        ----------
+        channel : list or None, default None
+            List of channel names or numbers. If None, gets all channels.
+        verbose : bool, default False
+            Whether to print additional information.
         """
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.get_channel_single(chan, verbose)
             if verbose:
-                print(f"All channels {channel} were successfully gotten")
+                print(f'All channels {channel} were successfully gotten')
                 print("------------------------")
         else:
-            self.get_channels(self.channel_names, verbose)  # If channel = None, do to all channels in the device
+            # If channel = None, get all the channels in the device
+            self.get_channels(self.channel_names, verbose)
         return None
 
     def get_channel_single(self, channel=None, verbose=False):
