@@ -16,6 +16,7 @@ Notes:
 from collections.abc import Iterable
 import time
 
+
 class SimulatedDeviceInfo:
     def __init__(
         self, description, serial_no, device_type, hardware_version,
@@ -39,6 +40,7 @@ class SimulatedChannel:
         self.HardwareVersion = hardware_version
         self.FirmwareVersion = firmware_version
         self.MotorDeviceSettings = 'Simulated Motor Device Settings'
+        self.IsEnabled = True
 
     def GetDeviceInfo(self):
         return SimulatedDeviceInfo(
@@ -51,6 +53,9 @@ class SimulatedChannel:
 
     def IsSettingsInitialized(self):
         return True
+
+    def StartPolling(self, pol_rate):
+        pass
 
 
 class SimulatedDevice:
@@ -181,9 +186,9 @@ class BBD30XController:
                     print('Opening device...')
                 self.device = \
                     BenchtopBrushlessMotor.CreateBenchtopBrushlessMotor(
-                    self.serialNo
-                )
-                self.device.Connect(self.serialNo)
+                        self.serial_no
+                    )
+                self.device.Connect(self.serial_no)
 
                 # Wait statements are important to allow settings to be sent
                 # to the device
@@ -271,7 +276,6 @@ class BBD30XController:
             print(f"MinVelocity: {velParams.MinVelocity}")
             print("------------------------")
         return None
-
 
     def _decimal_to_float(self, decimal):
         """Convert Decimal to float.
@@ -406,7 +410,9 @@ class BBD30XController:
         """
         chan_idx = self._get_channel_idx(channel)
         try:
-            channel_config = self.channels[chan_idx].LoadMotorConfiguration(self.channels[chan_idx].DeviceID)
+            channel_config = self.channels[chan_idx].LoadMotorConfiguration(
+                self.channels[chan_idx].DeviceID
+            )
             if verbose:
                 print(f'Channel {channel} configuration loaded:')
                 print(channel_config)
@@ -489,61 +495,85 @@ class BBD30XController:
             print(f'Setting set for channel {channel}')
         return None
 
-    def start_polling_channels(self, channel=None, pol_rate=250, verbose=False):
-        """Start polling specified channels.
+    def start_polling_channels(
+        self, channel=None, pol_rate=250, verbose=False
+    ):
+        """
+        Start polling specified channels.
 
-        Args:
-            channel (list or None, optional): List of channel names or numbers. If None, starts polling for all channels. Defaults to None.
-            pol_rate (int, optional): Polling rate in milliseconds. Defaults to 250.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+        Parameters
+        ----------
+        channel : list or None, default None
+            List of channel names or numbers. If None, starts polling for all
+            channels.
+        pol_rate : int, default 250
+            Polling rate in milliseconds.
+        verbose : bool, default False
+            Whether to print additional information.
         """
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.start_polling_single(chan, pol_rate, verbose)
             if verbose:
-                print(f"Polling all channels {channel}")
-                print("------------------------")
+                print(f'Polling all channels {channel}')
+                print('------------------------')
         else:
-            self.start_polling_channels(self.channel_names, pol_rate, verbose)  # If channel = None, do to all channels in the device
+            # If channel = None, start polling all channels in the device
+            self.start_polling_channels(self.channel_names, pol_rate, verbose)
         return None
 
     def start_polling_single(self, channel=None, pol_rate=250, verbose=False):
-        """Start polling a single channel.
-
-        Args:
-            channel (str or int, optional): Channel name or number. Defaults to None.
-            pol_rate (int, optional): Polling rate in milliseconds. Defaults to 250.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
         """
-        self.channels[self._get_channel_idx(channel)].StartPolling(pol_rate)  # polling rate in ms
+        Start polling a single channel.
+
+        Parameters
+        ----------
+        channel : str, int or None, default None
+            Channel name or number
+        pol_rate : int, default 250
+            Polling rate in milliseconds.
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        # Polling rate in ms
+        self.channels[self._get_channel_idx(channel)].StartPolling(pol_rate)
         if verbose:
-            print(f"Polling channel {channel}")
+            print(f'Polling channel {channel}')
         time.sleep(0.25)
         return None
 
     def enable_channels(self, channel=None, verbose=False):
-        """Enable specified channels.
+        """
+        Enable specified channels.
 
-        Args:
-            channel (list or None, optional): List of channel names or numbers. If None, enables all channels. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+        Parameters
+        ----------
+        channel : list or None, default None
+            List of channel names or numbers. If None, enables all channels.
+        verbose : bool, default False
+            Whether to print additional information.
         """
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.enable_single(chan, verbose)
             if verbose:
-                print(f"All channels {channel} are ENABLED")
-                print("------------------------")
+                print(f'All channels {channel} are ENABLED')
+                print('------------------------')
         else:
-            self.enable_channels(self.channel_names, verbose)  # If channel = None, do to all channels in the device
+            # If channel = None, do to all channels in the device
+            self.enable_channels(self.channel_names, verbose)
         return None
 
     def enable_single(self, channel=None, verbose=False):
-        """Enable a single channel.
+        """
+        Enable a single channel.
 
-        Args:
-            channel (str or int, optional): Channel name or number. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+        Parameters
+        ----------
+        channel : str, int or None, default None
+            Channel name or number.
+        verbose : bool, default False
+            Whether to print additional information.
         """
         chan_idx = self._get_channel_idx(channel)
         if not self.channels[chan_idx].IsEnabled:
@@ -924,12 +954,19 @@ class BBD30XController:
         self.stop_polling_channels(verbose=verbose)
         self.disconnect(verbose=verbose)
 
-    def standard_initialize_channels(self, home=True, force_home=False, verbose=False):
+    def standard_initialize_channels(
+        self, home=True, force_home=False, verbose=False
+    ):
         """Standard initialization of the channels.
 
-        Args:
-            force_home (bool, optional): Whether to force homing even if already homed. Defaults to False.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+        Parameters
+        ----------
+        home : bool, default True
+            Whether to home the channels.
+        force_home : bool, default False
+            Whether to force homing even if already homed.
+        verbose : bool, default False
+            Whether to print additional information.
         """
         self.start_polling_channels(verbose=verbose)
         self.enable_channels(verbose=verbose)
@@ -1012,27 +1049,25 @@ class BBD30XController:
             bool: True if the channel is settled, False otherwise.
         """
         return channel.Status.IsSettled
-    
+
     def test_basic(self):
         """Test basic functionality of the device."""
         self.standard_initialize_channels(home=False, verbose=True)
-        self.print_position()
-        self.print_velocity_params()
-        self.set_velocity_params(max_vel=200, acc=1100, verbose=True)
-        self.print_velocity_params()
-        self.print_position()
-        self.finish(verbose=True)
+        # self.print_position()
+        # self.print_velocity_params()
+        # self.set_velocity_params(max_vel=200, acc=1100, verbose=True)
+        # self.print_velocity_params()
+        # self.print_position()
+        # self.finish(verbose=True)
 
 
 if __name__ == '__main__':
-    conn = BBD30XController(simulated=True, verbose=True, very_verbose=True)
+    # Initialise a simulated test controller
+    name = 'BBD30X'
+    conn = BBD30XController(
+        name=name, simulated=True, verbose=True, very_verbose=True
+    )
 
-    # # Test an alternative configuration
-    # name = 'BBD30X'
-    # conn = BBD30XController(
-    #     name=name, simulated=True, verbose=True, very_verbose=True
-    # )
-
-    # conn.test_basic()
+    conn.test_basic()
     # conn.moveTo([53.452546, 30.3564564], max_vel=10, acc=200, verbose=True)
     # conn.finish(verbose=True)
