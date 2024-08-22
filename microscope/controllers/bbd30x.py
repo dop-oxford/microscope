@@ -370,37 +370,47 @@ class BBD30XController:
         return None
 
     def load_config_channels(self, channel=None, verbose=False):
-        """Load configuration settings for the specified channels.
+        """
+        Load configuration settings for the specified channels.
 
-        Args:
-            channel (list or None, optional): List of channel names or numbers. If None, loads settings for all channels. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+        Parameters
+        ----------
+        channel : list or None, default None
+            List of channel names or numbers. If None, loads settings for all
+            channels.
+        verbose : bool, default False
+            Whether to print additional information.
         """
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.load_config_channel_single(chan, verbose)
             if verbose:
-                print(f"Configuration loaded for all channels {channel}")
-                print("------------------------")
+                print(f'Configuration loaded for all channels {channel}')
+                print('------------------------')
         else:
-            self.load_config_channels(self.channel_names, verbose)  # If channel = None, do to all channels in the device
+            # If channel = None, load configs for all channels in the device
+            self.load_config_channels(self.channel_names, verbose)
         return None
 
     def load_config_channel_single(self, channel=None, verbose=False):
-        """Load configuration settings for a single channel.
+        """
+        Load configuration settings for a single channel.
 
-        Args:
-            channel (str or int, optional): Channel name or number. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+        Parameters
+        ----------
+        channel : str or int, default None
+            Channel name or number.
+        verbose : bool, default False
+            Whether to print additional information.
         """
         chan_idx = self._get_channel_idx(channel)
         try:
             channel_config = self.channels[chan_idx].LoadMotorConfiguration(self.channels[chan_idx].DeviceID)
+            if verbose:
+                print(f'Channel {channel} configuration loaded:')
+                print(channel_config)
         except Exception as e:
             print(f'Exception raised loading configuration for channel {channel}: {e}')
-        if verbose:
-            print(f"Channel {channel} configuration loaded:")
-            print(channel_config)
         return None
 
     def set_setting_channels(self, channel=None, deviceSettings=None, verbose=False):
