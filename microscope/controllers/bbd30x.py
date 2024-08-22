@@ -38,6 +38,7 @@ class SimulatedChannel:
         self.DeviceType = device_type
         self.HardwareVersion = hardware_version
         self.FirmwareVersion = firmware_version
+        self.MotorDeviceSettings = 'Simulated Motor Device Settings'
 
     def GetDeviceInfo(self):
         return SimulatedDeviceInfo(
@@ -203,12 +204,12 @@ class BBD30XController:
                     f'{self.serial_no}. Exception: {e}'
                 )
 
-            # # Get motherboard configurations
-            # self.mb_config = self.device.GetMotherboardConfiguration(
-            #     self.serial_no,
-            #     DeviceConfiguration.DeviceSettingsUseOptionType.
-            #     UseDeviceSettings
-            # )
+            # Get motherboard configurations
+            self.mb_config = self.device.GetMotherboardConfiguration(
+                self.serial_no,
+                DeviceConfiguration.DeviceSettingsUseOptionType.
+                UseDeviceSettings
+            )
 
             # Get synchronous controller
             # See https://github.com/Thorlabs/Motion_Control_Examples/blob/
@@ -413,47 +414,79 @@ class BBD30XController:
             print(f'Exception raised loading configuration for channel {channel}: {e}')
         return None
 
-    def set_setting_channels(self, channel=None, deviceSettings=None, verbose=False):
-        """Set settings for the specified channels.
+    def set_setting_channels(
+        self, channel=None, device_settings=None, verbose=False
+    ):
+        """
+        Set settings for the specified channels.
 
-        Args:
-            channel (list or None, optional): List of channel names or numbers. If None, sets settings for all channels. Defaults to None.
-            deviceSettings (list or None, optional): List of device settings. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+        Parameters
+        ----------
+        channel : list or None, default None
+            List of channel names or numbers. If None, sets settings for all
+            channels.
+        device_settings : list or None, default None
+            List of device settings.
+        verbose : bool, default False
+            Whether to print additional information.
         """
         if not channel:
-            self.set_setting_channels(self.channel_names, deviceSettings, verbose)  # If channel = None, do to all channels in the device
+            # If channel = None, do to all channels in the device
+            self.set_setting_channels(
+                self.channel_names, device_settings, verbose
+            )
         else:
             channel = list(channel)
-            assert len(channel) == len(set(channel)), f"Duplicate channel name/number: {channel}"  # Check that no name/number is duplicate
-            assert all(isinstance(n, int) for n in channel) or all(isinstance(n, str) for n in channel), "The list of channels is not integers or strings."  # Test if channels are given in numbers
-            if isinstance(deviceSettings, (list, tuple)):
-                assert len(deviceSettings) == len(channel), f"Mismatch between number of channels ({len(channel)}) and deviceSettings ({len(deviceSettings)})"
+            # Check that no name/number is duplicate
+            assert len(channel) == len(set(channel)), (
+                f'Duplicate channel name/number: {channel}'
+            )
+            # Test if channels are given in numbers
+            assert all(isinstance(n, int) for n in channel) or \
+                all(isinstance(n, str) for n in channel), (
+                    'The list of channels is not integers or strings.'
+                )
+            if isinstance(device_settings, (list, tuple)):
+                assert len(device_settings) == len(channel), (
+                    f'Mismatch between number of channels ({len(channel)}) '
+                    f'and device_settings ({len(device_settings)})'
+                )
             else:
-                deviceSettings = len(channel) * [deviceSettings, ]
+                device_settings = len(channel) * [device_settings, ]
             for chan in channel:
-                self.set_setting_channel_single(chan, deviceSettings[channel.index(chan)], verbose)
+                self.set_setting_channel_single(
+                    chan, device_settings[channel.index(chan)], verbose
+                )
             if verbose:
-                print(f"Settings set for all channels: {channel}")
-                print("------------------------")
+                print(f'Settings set for all channels: {channel}')
+                print('------------------------')
         return None
 
-    def set_setting_channel_single(self, channel=None, deviceSettings=None, verbose=False):
-        """Set settings for a single channel.
-
-        Args:
-            channel (str or int, optional): Channel name or number. Defaults to None.
-            deviceSettings (any, optional): Device settings to apply. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+    def set_setting_channel_single(
+        self, channel=None, device_settings=None, verbose=False
+    ):
         """
-        if not deviceSettings:
-            deviceSettings = self.channels[self._get_channel_idx(channel)].MotorDeviceSettings
+        Set settings for a single channel.
+
+        Parameters
+        ----------
+        channel : str or int, default None
+            Channel name or number.
+        device_settings : unknown type, default None
+            Device settings to apply.
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        if not device_settings:
+            device_settings = self.channels[self._get_channel_idx(channel)].MotorDeviceSettings
         try:
-            self.channels[self._get_channel_idx(channel)].SetSettings(deviceSettings, False)
+            self.channels[self._get_channel_idx(channel)].SetSettings(
+                device_settings, False
+            )
         except Exception as e:
             print(f'Exception raised setting channel {channel}: {e}')
         if verbose:
-            print(f"Setting set for channel {channel}")
+            print(f'Setting set for channel {channel}')
         return None
 
     def start_polling_channels(self, channel=None, pol_rate=250, verbose=False):
