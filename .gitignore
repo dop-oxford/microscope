@@ -22,4 +22,6 @@
 
 ## Log files
 *.log
-.vscode/settings.json
+
+# vscode
+.vscode
