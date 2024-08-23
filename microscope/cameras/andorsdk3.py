@@ -625,7 +625,7 @@ class AndorSDK3(
 
     @microscope.abc.keep_acquiring
     def _set_roi(self, roi):
-        current = self._get_roi()
+        current = self.get_roi()
         if self._acquiring:
             self.abort()
         try:

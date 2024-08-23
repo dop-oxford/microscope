@@ -1565,7 +1565,7 @@ class AndorAtmcd(
         # Roi
         name = "Roi"
         self.add_setting(
-            name, "tuple", self._get_roi, lambda roi: self._set_roi(*roi), None
+            name, "tuple", self.get_roi, lambda roi: self.set_roi(*roi), None
         )
         # BaselineClamp
         name = "BaselineClamp"
