@@ -42,7 +42,7 @@ class _GenericStageAxis(microscope.abc.StageAxis):
             self._position += delta
         # TODO: api on calling the controller? how does it know what channel to move? name? channel number?
         else:
-            self.controller.move_to(delta, self.name)
+            self.controller.move_by(delta, self.name)
 
     def move_to(self, pos: float):
         # move the device to a certain position
