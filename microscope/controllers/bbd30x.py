@@ -29,18 +29,31 @@ class SimulatedDeviceInfo:
         self.FirmwareVersion = firmware_version
 
 
+class SimulatedVelocityParams:
+    def __init__(
+        self, acceleration, max_velocity, min_velocity
+    ):
+        self.Acceleration = acceleration
+        self.MaxVelocity = max_velocity
+        self.MinVelocity = min_velocity
+
+
 class SimulatedChannel:
     def __init__(
         self, description, serial_no, device_type, hardware_version,
-        firmware_version
+        firmware_version, acceleration=10, max_velocity=20, min_velocity=1
     ):
         self.Description = description
         self.SerialNumber = serial_no
         self.DeviceType = device_type
         self.HardwareVersion = hardware_version
         self.FirmwareVersion = firmware_version
+        self.Acceleration = acceleration
+        self.MaxVelocity = max_velocity
+        self.MinVelocity = min_velocity
         self.MotorDeviceSettings = 'Simulated Motor Device Settings'
         self.IsEnabled = True
+        self.Position = 0.0
 
     def GetDeviceInfo(self):
         return SimulatedDeviceInfo(
@@ -49,6 +62,13 @@ class SimulatedChannel:
             device_type=self.DeviceType,
             hardware_version=self.HardwareVersion,
             firmware_version=self.FirmwareVersion
+        )
+
+    def GetVelocityParams(self):
+        return SimulatedVelocityParams(
+            acceleration=self.Acceleration,
+            max_velocity=self.MaxVelocity,
+            min_velocity=self.MinVelocity
         )
 
     def IsSettingsInitialized(self):
@@ -261,20 +281,23 @@ class BBD30XController:
         return None
 
     def print_velocity_params(self, channel=['X', 'Y']):
-        """Print the velocity parameters of the channels.
+        """
+        Print the velocity parameters of the channels.
 
-        Args:
-            channel (list, optional): List of channel names or numbers. Defaults to ['X', 'Y'].
+        Parameters
+        ----------
+        channel : list, default ['X', 'Y']
+            List of channel names or numbers.
         """
         self._make_channel_iterator(channel)
         for chan in channel:
             chan_idx = self._get_channel_idx(chan)
-            velParams = self.channels[chan_idx].GetVelocityParams()
-            print(f"Channel {chan} Velocity Parameters")
-            print(f"Acceleration: {velParams.Acceleration}")
-            print(f"MaxVelocity: {velParams.MaxVelocity}")
-            print(f"MinVelocity: {velParams.MinVelocity}")
-            print("------------------------")
+            vel_params = self.channels[chan_idx].GetVelocityParams()
+            print(f'Channel {chan} Velocity Parameters')
+            print(f'Acceleration: {vel_params.Acceleration}')
+            print(f'MaxVelocity: {vel_params.MaxVelocity}')
+            print(f'MinVelocity: {vel_params.MinVelocity}')
+            print('------------------------')
         return None
 
     def _decimal_to_float(self, decimal):
@@ -873,36 +896,47 @@ class BBD30XController:
                 f'Acceleration: {str(self.channels[chan_idx].GetVelocityParams().Acceleration)} mm/s2')
         return None
 
-
     def print_position(self):
         """Print the current position of the device."""
-        print(f"Device position: channels {self.channel_names} - {self.get_position()} mm")
-    
+        name = self.channel_names
+        position = self.get_position()
+        print(f'Device position: channels {name} - {position} mm')
+
     def get_position_decimal(self, channel):
-        """Get the current position of a single channel in Decimal.
+        """
+        Get the current position of a single channel in Decimal.
 
-        Args:
-            channel (str or int): Channel name or number.
+        Parameters
+        ----------
+        channel : str or int
+            Channel name or number.
 
-        Returns:
-            Decimal: Current position of the channel.
+        Returns
+        -------
+        Decimal
+            Current position of the channel.
         """
         return self.channels[self._get_channel_idx(channel)].Position
 
-
     def get_position_channel(self, channel, verbose=False):
-        """Get the current position of a single channel.
+        """
+        Get the current position of a single channel.
 
-        Args:
-            channel (str or int): Channel name or number.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+        Parameters
+        ----------
+        channel : str or int
+            Channel name or number.
+        verbose : bool, default False
+            Whether to print additional information.
 
-        Returns:
-            Float: Current position of the channel.
+        Returns
+        -------
+        float
+            Current position of the channel.
         """
         pos = self._decimal_to_float(self.get_position_decimal(channel))
         if verbose:
-            print(f"Channel {channel} is in position {pos} mm")
+            print(f'Channel {channel} is in position {pos} mm')
         return pos
 
     def get_velocity_params(self, channel, verbose=False):
@@ -923,15 +957,23 @@ class BBD30XController:
         return self._decimal_to_float(velParams.MaxVelocity), self._decimal_to_float(velParams.Acceleration)
 
     def get_position(self, verbose=False):
-        """Get the current position of the device.
-
-        Args:
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
-
-        Returns:
-            list: List of current positions for each channel.
         """
-        pos = [self.get_position_channel(chan, verbose=verbose) for chan in self.channel_names]
+        Get the current position of the device.
+
+        Parameters
+        ----------
+        verbose : bool, default False
+            Whether to print additional information.
+
+        Returns
+        -------
+        list
+            List of current positions for each channel.
+        """
+        pos = [
+            self.get_position_channel(chan, verbose=verbose)
+            for chan in self.channel_names
+        ]
         return pos
 
     def disconnect(self, verbose=False):
@@ -1053,8 +1095,8 @@ class BBD30XController:
     def test_basic(self):
         """Test basic functionality of the device."""
         self.standard_initialize_channels(home=False, verbose=True)
-        # self.print_position()
-        # self.print_velocity_params()
+        self.print_position()
+        self.print_velocity_params()
         # self.set_velocity_params(max_vel=200, acc=1100, verbose=True)
         # self.print_velocity_params()
         # self.print_position()
