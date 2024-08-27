@@ -71,23 +71,29 @@ class CS165CUCamera(microscope.abc.Camera):
             lambda: (0, 8192),
         )
 
-        try:
-            # setup the path to the DLLs
-            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            absolute_path_to_dlls = os.path.join(project_root, relative_path_to_dlls)
-            os.environ['PATH'] = absolute_path_to_dlls + os.pathsep + os.environ['PATH']
-            os.add_dll_directory(absolute_path_to_dlls)
-        except Exception as exception:
-            _logger.error("Could not set path to DLLs: %s", str(exception))
-        
+        self.relative_path_to_dlls = relative_path_to_dlls
+        self.simulated = simulated
+        self.verbose = verbose
+        self.very_verbose = very_verbose
+        self.camera_name = camera_name
+
         # TODO: we can't hard set the trigger mode really
         self._trigger_mode = "software"
         self._acquiring = False
         self._triggered = 0
         self._sent = 0
-        self.simulated = simulated
+
+        # default values for sdk, camera list and camera 
+        self.sdk = {}
+        self.camera_list = None
+        self.camera = {}
+
+        self._is_color = (
+            False  # TODO: This is a hack that needs removed later.
+        )
 
         if self.simulated:
+             # simulated camera
             self._simulated_settings = {
                 'sensor_shape': (512, 512),
                 'roi': microscope.ROI(0, 0, 512, 512),
@@ -116,31 +122,38 @@ class CS165CUCamera(microscope.abc.Camera):
                 self._image_generator.enable_numbering,
                 None,
             )
-        self._is_color = (
-            False  # TODO: This is a hack that needs removed later.
-        )
-        self.verbose = verbose
-        self.very_verbose = very_verbose
-        self.camera_name = camera_name
-        try:  # TODO: This is a hack that needs removed later.
+            return
+
+        # real camera
+        if not self.relative_path_to_dlls:
+            raise ValueError(
+                "Relative path to DLLs must be provided for simulated camera."
+            )
+        try:
+            # setup the path to the DLLs
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            absolute_path_to_dlls = os.path.join(project_root, relative_path_to_dlls)
+            os.environ['PATH'] = absolute_path_to_dlls + os.pathsep + os.environ['PATH']
+            os.add_dll_directory(absolute_path_to_dlls)
+        except Exception as exception:
+            _logger.error("Could not set path to DLLs: %s", str(exception))
+            raise exception
+
+        try: 
+            # initialize the SDK
+            # TODO: This is a hack that needs removed later.
             self.sdk = TLCameraSDK()
         except Exception as exception:
-            self.sdk = {}
-            print(exception)
-            warnings.warn("SDK not working")
-            
-        try:  # TODO: This is a hack that needs removed later.
+            _logger.error("SDK not initialised: %s", str(exception)) 
+            raise exception
+
+        try:
+            # get the camera list
             self.camera_list = self.sdk.discover_available_cameras()
             print(f"Cameras found: {self.camera_list}")
-        except:
-            self.camera_list = None
-            warnings.warn("No cameras have been found")
-
-        if not self.camera_list:
-            self.simulated = True
-            self.camera = {}
-            warnings.warn("No cameras have been found")
-            return
+        except Exception as exception:
+            _logger.error("No cameras have been found: %s", str(exception))
+            raise exception
 
         if camera_number:
             self.camera = self.sdk.open_camera(self.camera_list[camera_number])
