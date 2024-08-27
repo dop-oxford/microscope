@@ -14,19 +14,8 @@ Notes:
     - Check Decimal to Float conversion
 """
 from collections.abc import Iterable
+from decimal import Decimal
 import time
-
-
-class SimulatedDeviceInfo:
-    def __init__(
-        self, description, serial_no, device_type, hardware_version,
-        firmware_version
-    ):
-        self.Description = description
-        self.SerialNumber = serial_no
-        self.DeviceType = device_type
-        self.HardwareVersion = hardware_version
-        self.FirmwareVersion = firmware_version
 
 
 class SimulatedVelocityParams:
@@ -56,7 +45,7 @@ class SimulatedChannel:
         self.Position = 0.0
 
     def GetDeviceInfo(self):
-        return SimulatedDeviceInfo(
+        return DeviceInfo(
             description=self.Description,
             serial_no=self.SerialNumber,
             device_type=self.DeviceType,
@@ -103,6 +92,18 @@ class SimulatedDevice:
         return self.channels[idx]
 
 
+class DeviceInfo:
+    def __init__(
+        self, description, serial_no, device_type, hardware_version,
+        firmware_version
+    ):
+        self.Description = description
+        self.SerialNumber = serial_no
+        self.DeviceType = device_type
+        self.HardwareVersion = hardware_version
+        self.FirmwareVersion = firmware_version
+
+
 class BBD30XController:
 
     def __init__(
@@ -138,6 +139,14 @@ class BBD30XController:
         self.simulated = simulated
         self.channel_names = channel_names
         self.reverse = reverse
+        
+        self.device_info = DeviceInfo(
+            description=self.name,
+            serial_no=self.serial_no,
+            device_type='Controller',
+            hardware_version='Unknown',
+            firmware_version='Unknown'
+        )
 
         # 1-indexed array of channel numbers
         self.channel_nums = range(1, len(self.channel_names) + 1)
@@ -270,8 +279,9 @@ class BBD30XController:
         for chan in channel:
             chan_idx = self._get_channel_idx(chan)
             channel_info = self.channels[chan_idx].GetDeviceInfo()
+            print('------------------------')
             print(f'Channel {chan} Info:')
-            print(f'Class: {self.channels[chan_idx]}')
+            print(f'Class: {type(self.channels[chan_idx])}')
             print(f'Channel Description: {channel_info.Description}')
             print(f'Channel Serial No: {channel_info.SerialNumber}')
             print(f'Channel Type: {channel_info.DeviceType}')
@@ -293,6 +303,7 @@ class BBD30XController:
         for chan in channel:
             chan_idx = self._get_channel_idx(chan)
             vel_params = self.channels[chan_idx].GetVelocityParams()
+            print('------------------------')
             print(f'Channel {chan} Velocity Parameters')
             print(f'Acceleration: {vel_params.Acceleration}')
             print(f'MaxVelocity: {vel_params.MaxVelocity}')
@@ -309,26 +320,41 @@ class BBD30XController:
         Returns:
             float: Float number.
         """
-        return float(str(decimal))        
-
+        # TODO: Write a test
+        return float(str(decimal))
 
     def _get_channel_idx(self, channel):
-        """Get the index of the channel.
-
-        Args:
-            channel (str or int): Channel name or number.
-
-        Returns:
-            int: Index of the channel.
         """
+        Get the index of the channel.
+
+        Parameters
+        ----------
+        channel : str or int
+            Channel name or number.
+
+        Returns
+        -------
+        int
+            Index of the channel.
+        """
+        # TODO: Write a test
         if isinstance(channel, int):
-            assert channel in self.channel_nums, f"Channel number {channel} is not in the list of channels for this device: {self.channel_nums}"
+            assert channel in self.channel_nums, (
+                f'Channel number {channel} is not in the list of channels ' +
+                f'for this device: {self.channel_nums}'
+            )
             chan_idx = self.channel_nums.index(channel)
         elif isinstance(channel, str):
-            assert channel in self.channel_names, f"Channel name {channel} is not in the list of channels for this device: {self.channel_names}"
+            assert channel in self.channel_names, (
+                f'Channel name {channel} is not in the list of channels for ' +
+                f'this device: {self.channel_names}'
+            )
             chan_idx = self.channel_names.index(channel)
         else:
-            raise Exception(f"The channel is not integer or string, the type is {type(channel)}.")
+            raise Exception(
+                'The channel is not integer or string, the type is ' +
+                f'{type(channel)}.'
+            )
         return chan_idx
 
     def get_channels(self, channel=None, verbose=False):
@@ -342,6 +368,7 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
+        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.get_channel_single(chan, verbose)
@@ -364,6 +391,7 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
+        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
         if isinstance(channel, int):
             chan_num = channel
@@ -409,6 +437,7 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
+        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.load_config_channel_single(chan, verbose)
@@ -431,6 +460,7 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
+        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
         try:
             channel_config = self.channels[chan_idx].LoadMotorConfiguration(
@@ -440,7 +470,10 @@ class BBD30XController:
                 print(f'Channel {channel} configuration loaded:')
                 print(channel_config)
         except Exception as e:
-            print(f'Exception raised loading configuration for channel {channel}: {e}')
+            print(
+                'Exception raised loading configuration for channel ' +
+                f'{channel}: {e}'
+            )
         return None
 
     def set_setting_channels(
@@ -459,6 +492,7 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
+        # TODO: Write a test
         if not channel:
             # If channel = None, do to all channels in the device
             self.set_setting_channels(
@@ -506,12 +540,13 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
+        # TODO: Write a test
         if not device_settings:
-            device_settings = self.channels[self._get_channel_idx(channel)].MotorDeviceSettings
+            this_channel = self.channels[self._get_channel_idx(channel)]
+            device_settings = this_channel.MotorDeviceSettings
         try:
-            self.channels[self._get_channel_idx(channel)].SetSettings(
-                device_settings, False
-            )
+            this_channel = self.channels[self._get_channel_idx(channel)]
+            this_channel.SetSettings(device_settings, False)
         except Exception as e:
             print(f'Exception raised setting channel {channel}: {e}')
         if verbose:
@@ -534,6 +569,7 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
+        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.start_polling_single(chan, pol_rate, verbose)
@@ -558,6 +594,7 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
+        # TODO: Write a test
         # Polling rate in ms
         self.channels[self._get_channel_idx(channel)].StartPolling(pol_rate)
         if verbose:
@@ -576,6 +613,7 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
+        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.enable_single(chan, verbose)
@@ -598,6 +636,7 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
+        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
         if not self.channels[chan_idx].IsEnabled:
             self.channels[self._get_channel_idx(channel)].EnableDevice()
@@ -610,12 +649,17 @@ class BBD30XController:
         return None
 
     def disable_channels(self, channel=None, verbose=False):
-        """Disable specified channels.
-
-        Args:
-            channel (list or None, optional): List of channel names or numbers. If None, disables all channels. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
         """
+        Disable specified channels.
+
+        Parameters
+        ----------
+        channel : list or None, default None
+            List of channel names or numbers. If None, disables all channels.
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.disable_single(chan, verbose)
@@ -623,25 +667,31 @@ class BBD30XController:
                 print(f"All channels {channel} are DISABLED")
                 print("------------------------")
         else:
-            self.disable_channels(self.channel_names, verbose)  # If channel = None, do to all channels in the device
+            # If channel = None, disable all channels in the device
+            self.disable_channels(self.channel_names, verbose)
         return None
 
     def disable_single(self, channel=None, verbose=False):
-        """Disable a single channel.
-
-        Args:
-            channel (str or int, optional): Channel name or number. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
         """
+        Disable a single channel.
+
+        Parameters
+        ----------
+        channel : str or int, default None
+            Channel name or number.
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
         if self.channels[chan_idx].IsEnabled:
             self.channels[self._get_channel_idx(channel)].DisableDevice()
             time.sleep(0.25)
             if verbose:
-                print(f"Channel {channel} DISABLED")
+                print(f'Channel {channel} DISABLED')
         else:
             if verbose:
-                print(f"Channel {channel} was already disabled")
+                print(f'Channel {channel} was already disabled')
         return None
 
     def _make_channel_iterator(self, channel):
@@ -658,6 +708,7 @@ class BBD30XController:
         tuple
             Tuple of channels over which to iterate.
         """
+        # TODO: Write a test
         if not isinstance(channel, (list, tuple)):
             channel = (channel,)
 
@@ -673,14 +724,19 @@ class BBD30XController:
 
         return tuple(channel)
 
-
     def stop_polling_channels(self, channel=None, verbose=False):
-        """Stop polling specified channels.
-
-        Args:
-            channel (list or None, optional): List of channel names or numbers. If None, stops polling for all channels. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
         """
+        Stop polling specified channels.
+
+        Parameters
+        ----------
+        channel : list or None, default None
+            List of channel names or numbers. If None, stops polling for all
+            channels.
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.stop_polling_single(chan, verbose)
@@ -688,157 +744,265 @@ class BBD30XController:
                 print(f"Stopped polling all channels {channel}")
                 print("------------------------")
         else:
-            self.stop_polling_channels(self.channel_names, verbose)  # If channel = None, do to all channels in the device
+            # If channel = None, stop polling all channels in the device
+            self.stop_polling_channels(self.channel_names, verbose)
         return None
 
     def stop_polling_single(self, channel=None, verbose=False):
-        """Stop polling a single channel.
-
-        Args:
-            channel (str or int, optional): Channel name or number. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
         """
+        Stop polling a single channel.
+
+        Parameters
+        ----------
+        channel : str or int, default None
+            Channel name or number.
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        # TODO: Write a test
         self.channels[self._get_channel_idx(channel)].StopPolling()
         if verbose:
-            print(f"Stopped polling channel {channel}")
+            print(f'Stopped polling channel {channel}')
         time.sleep(0.25)
         return None
 
     def home_channels(self, channel=None, force=True, verbose=False):
-        """Home specified channels.
-
-        Args:
-            channel (list or None, optional): List of channel names or numbers. If None, homes all channels. Defaults to None.
-            force (bool, optional): Whether to force homing even if already homed. Defaults to True.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
         """
+        Home specified channels.
+
+        Parameters
+        ----------
+        channel : list or None, default None
+            List of channel names or numbers. If None, homes all channels.
+        force : bool, default True
+            Whether to force homing even if already homed.
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.home_single(chan, force, verbose)
             if verbose:
-                print(f"All channels {channel} are HOMED")
-                print("------------------------")
+                print(f'All channels {channel} are HOMED')
+                print('------------------------')
         else:
-            self.home_channels(self.channel_names, force, verbose)  # If channel = None, do to all channels in the device
+            # If channel = None, home all channels in the device
+            self.home_channels(self.channel_names, force, verbose)
         return None
 
     def home_single(self, channel=None, force=True, verbose=False):
-        """Home a single channel.
-
-        Args:
-            channel (str or int, optional): Channel name or number. Defaults to None.
-            force (bool, optional): Whether to force homing even if already homed. Defaults to True.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
         """
+        Home a single channel.
+
+        Parameters
+        ----------
+        channel : str or int, default None
+            Channel name or number.
+        force : bool, default True
+            Whether to force homing even if already homed.
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
-        assert self.channels[chan_idx].NeedsHoming, f"Channel {self.channels[chan_idx]} does not need homing"
+        assert self.channels[chan_idx].NeedsHoming, (
+            f'Channel {self.channels[chan_idx]} does not need homing'
+        )
         if not self.channels[chan_idx].Status.IsHomed or force:
-            assert self.channels[chan_idx].CanHome, f"Channel {self.channels[chan_idx]} cannot home"
+            assert self.channels[chan_idx].CanHome, (
+                f'Channel {self.channels[chan_idx]} cannot home'
+            )
             if verbose:
-                print(f"Homing Channel {channel}...")
-            self.channels[chan_idx].Home(60000)  # 60 second timeout
+                print(f'Homing Channel {channel}...')
+            # 60 second timeout
+            self.channels[chan_idx].Home(60000)
             time.sleep(0.25)
-            assert self.channels[chan_idx].Status.IsHomed, f"Channel {self.channels[chan_idx]} was not HOMED after 60 seconds"
+            assert self.channels[chan_idx].Status.IsHomed, (
+                f'Channel {self.channels[chan_idx]} was not HOMED after 60 ' +
+                'seconds'
+            )
             if verbose:
-                print(f"Channel {channel} HOMED")
+                print(f'Channel {channel} HOMED')
         else:
-            print(f"Channel {channel} was already homed")
+            print(f'Channel {channel} was already homed')
         return None
 
     def moveToFast(self, target_pos):
-        """Move channels to specified positions quickly.
-
-        Args:
-            target_pos (list): List of end positions for each channel.
         """
+        Move channels to specified positions quickly.
+
+        Parameters
+        ----------
+        target_pos : list
+            List of end positions for each channel.
+        """
+        # TODO: Write a test
         for chan_idx, chan_target_pos in enumerate(target_pos):
             try:
-                self.channels[chan_idx].MoveTo(Decimal(float(chan_target_pos)), 60000)  # 60 second timeout
+                # 60 second timeout
+                self.channels[chan_idx].MoveTo(
+                    Decimal(float(chan_target_pos)), 60000
+                )
             except Exception as e:
-                print(f'Exception raised moving channel {chan_idx} {self.channels[chan_idx]} to {chan_target_pos} mm: {e}')
+                print(
+                    f'Exception raised moving channel {chan_idx} ' +
+                    f'{self.channels[chan_idx]} to {chan_target_pos} mm: {e}'
+                )
 
-    def moveTo(self, target_pos, channel=None, relative=False, max_vel=None, acc=None, permanent=False, verbose=False):
-        """Move channels to specified positions.
-
-        Args:
-            target_pos (list): List of end positions for each channel.
-            channel (list or None, optional): List of channel names or numbers. If None, moves all channels. Defaults to None.
-            relative (bool): If True, the movement is relative to the current position.
-            max_vel (float or None, optional): Maximum velocity. Defaults to None.
-            acc (float or None, optional): Acceleration. Defaults to None.
-            permanent (bool, optional): Whether to make velocity and acceleration changes permanent. Defaults to False.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+    def moveTo(
+        self, target_pos, channel=None, relative=False, max_vel=None, acc=None,
+        permanent=False, verbose=False
+    ):
         """
+        Move channels to specified positions.
+
+        Parameters
+        ----------
+        target_pos : list
+            List of end positions for each channel.
+        channel : list or None, default None
+            List of channel names or numbers. If None, moves all channels.
+        relative : bool, default False
+            If True, the movement is relative to the current position.
+        max_vel : float or None, default None.
+            Maximum velocity.
+        acc : float or None, default None
+            Acceleration.
+        permanent : bool, default False
+            Whether to make velocity and acceleration changes permanent.
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        # TODO: Write a test
         if not channel:
             channel = self.channel_names
         channel = self._make_channel_iterator(channel)
         if type(target_pos) is not Iterable:
             target_pos = [target_pos]
         if len(target_pos) != len(channel):
-            raise ValueError(f"Number of target positions ({len(target_pos)}) does not match the number of channels ({len(channel)})")
+            raise ValueError(
+                f'Number of target positions ({len(target_pos)}) does not ' +
+                f'match the number of channels ({len(channel)})'
+            )
         for chan_idx in range(len(channel)):
-            self.moveTo_channel(target_pos[chan_idx], channel[chan_idx], relative, max_vel, acc, permanent, verbose)  # max_vel and acc are set to none since they have already been changed
+            # max_vel and acc are set to none since they have already been
+            # changed
+            self.moveTo_channel(
+                target_pos[chan_idx], channel[chan_idx], relative, max_vel,
+                acc, permanent, verbose
+            )
         if verbose:
             self.print_position()
         return None
 
-    def moveTo_channel(self, target_pos, channel, relative=False, max_vel=None, acc=None, permanent=False, verbose=False):
-        """Move a single channel to the specified position.
-
-        Args:
-            target_pos (float): End position.
-            channel (str or int): Channel name or number.
-            relative (bool): If True, the movement is relative to the current position.
-            max_vel (float or None, optional): Maximum velocity. Defaults to None.
-            acc (float or None, optional): Acceleration. Defaults to None.
-            permanent (bool, optional): Whether to make velocity and acceleration changes permanent. Defaults to False.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+    def moveTo_channel(
+        self, target_pos, channel, relative=False, max_vel=None, acc=None,
+        permanent=False, verbose=False
+    ):
         """
+        Move a single channel to the specified position.
+
+        Parameters
+        ----------
+        target_pos : float
+            End position.
+        channel : str or int
+            Channel name or number.
+        relative : bool, default False
+            If True, the movement is relative to the current position.
+        max_vel : float or None, default None
+            Maximum velocity.
+        acc : float or None, default None
+            Acceleration.
+        permanent : bool, default False
+            Whether to make velocity and acceleration changes permanent.
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
         vel_params_original = None
         if verbose:
             print(f'Moving channel {channel} to {str(target_pos)} mm...')
-        if relative: target_pos = self.get_position_channel(channel) + target_pos
-        target_pos = Decimal(float(target_pos))  # TODO -> fix this and make it coherent
+        if relative:
+            target_pos = self.get_position_channel(channel) + target_pos
+        # TODO: Fix this and make it coherent
+        target_pos = Decimal(float(target_pos))
         if max_vel or acc:  # If either maxVel or acc are given
             vel_params_original = self.get_velocity_params(channel, verbose)
             self.set_velocity_params(channel, max_vel, acc, verbose)
         try:
-            self.channels[chan_idx].MoveTo(target_pos, 60000)  # 60 second timeout
+            # 60 second timeout
+            self.channels[chan_idx].MoveTo(target_pos, 60000)
         except Exception as e:
-            print(f'Exception raised moving channel {channel} to {str(target_pos)} mm: {e}')
+            print(
+                f'Exception raised moving channel {channel} to ' +
+                f'{str(target_pos)} mm: {e}'
+            )
         time.sleep(0.25)
         if verbose:
             time.sleep(0.25)
-            print(f"Channel {channel} in position {self.get_position_channel(channel)}")
-        if vel_params_original and not permanent:  # if it has been changed (i.e. it is not None anymore)
-            #self.channels[chan_idx].SetVelocityParams(*vel_params_original)
-            self.set_velocity_params(channel=channel, max_vel=vel_params_original[0], acc=vel_params_original[1], verbose=verbose)
+            print(
+                f'Channel {channel} in position ' +
+                f'{self.get_position_channel(channel)}'
+            )
+        if vel_params_original and not permanent:
+            # If it has been changed (ie it is not None any more)
+            # self.channels[chan_idx].SetVelocityParams(*vel_params_original)
+            self.set_velocity_params(
+                channel=channel, max_vel=vel_params_original[0],
+                acc=vel_params_original[1], verbose=verbose
+            )
         return None
 
-    def moveTo_channel_relative(self, rel_pos, channel, max_vel=None, acc=None, permanent=False, verbose=False):
-        """Move a single channel to the specified position.
-
-        Args:
-            rel_pos (float): Relative position.
-            channel (str or int): Channel name or number.
-            max_vel (float or None, optional): Maximum velocity. Defaults to None.
-            acc (float or None, optional): Acceleration. Defaults to None.
-            permanent (bool, optional): Whether to make velocity and acceleration changes permanent. Defaults to False.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+    def moveTo_channel_relative(
+        self, rel_pos, channel, max_vel=None, acc=None, permanent=False,
+        verbose=False
+    ):
         """
-        self.moveTo_channel(target_pos=rel_pos, channel=channel, relative=True, max_vel=max_vel, acc=acc, permanent=permanent, verbose=verbose)
-        
-        
-    def set_velocity_params(self, channel=None, max_vel=None, acc=None, verbose=False):
-        """Set velocity parameters for the specified channels.
+        Move a single channel to the specified position.
 
-        Args:
-            channel (list or None, optional): List of channel names or numbers. If None, sets parameters for all channels. Defaults to None.
-            max_vel (float or None, optional): Maximum velocity. Defaults to None.
-            acc (float or None, optional): Acceleration. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+        Parameters
+        ----------
+        rel_pos : float
+            Relative position.
+        channel : str or int
+            Channel name or number.
+        max_vel : float or None, default None
+            Maximum velocity.
+        acc : float or None, default None
+            Acceleration.
+        permanent : bool, default False
+            Whether to make velocity and acceleration changes permanent.
+        verbose : bool, default False
+            Whether to print additional information.
         """
+        # TODO: Write a test
+        self.moveTo_channel(
+            target_pos=rel_pos, channel=channel, relative=True,
+            max_vel=max_vel, acc=acc, permanent=permanent, verbose=verbose
+        )
+
+    def set_velocity_params(
+        self, channel=None, max_vel=None, acc=None, verbose=False
+    ):
+        """
+        Set velocity parameters for the specified channels.
+
+        Parameters
+        ----------
+        channel : list or None, default None
+            List of channel names or numbers. If None, sets parameters for all
+            channels.
+        max_vel : float or None, default None
+            Maximum velocity.
+        acc : float or None, default None
+            Acceleration.
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        # TODO: Write a test
         if channel:
             channel = self._make_channel_iterator(channel)
             max_vel = (max_vel,) if max_vel is not None else None
@@ -847,57 +1011,87 @@ class BBD30XController:
                 if len(max_vel) == 1:
                     max_vel = len(channel) * (max_vel[0],)
                 else:
-                    assert len(max_vel) == len(channel), f"The number of max_vel ({len(max_vel)}) does not match the number of channels ({len(channel)})"
+                    assert len(max_vel) == len(channel), (
+                        f'The number of max_vel ({len(max_vel)}) does not ',
+                        f'match the number of channels ({len(channel)})'
+                    )
             if acc is not None:
                 if len(acc) == 1:
                     acc = len(channel) * (acc[0],)
                 else:
-                    assert len(acc) == len(channel), f"The number of acc ({len(acc)}) does not match the number of channels ({len(channel)})"
+                    assert len(acc) == len(channel), (
+                        f'The number of acc ({len(acc)}) does not match the '
+                        f'number of channels ({len(channel)})'
+                    )
             for chan_idx in range(len(channel)):
-                self.set_velocity_params_single(channel[chan_idx], max_vel[chan_idx] if max_vel else None, acc[chan_idx] if acc else None, verbose)
+                self.set_velocity_params_single(
+                    channel[chan_idx],
+                    max_vel[chan_idx] if max_vel else None,
+                    acc[chan_idx] if acc else None,
+                    verbose
+                )
             if verbose:
-                print(f'Velocity parameters for all channels {channel} set at:\n', f'Max vel {max_vel} mm/s\n', f'Acceleration: {acc} mm/s2')
-                print("------------------------")
+                print(f'Velocity params for all channels {channel} set at:')
+                print(f'Max vel: {max_vel} mm/s')
+                print(f'Acceleration: {acc} mm/s2')
+                print('------------------------')
         else:
-            self.set_velocity_params(self.channel_names, max_vel, acc, verbose)  # If channel = None, do to all channels in the device
+            # If channel = None, set parameters for all channels in the device
+            self.set_velocity_params(self.channel_names, max_vel, acc, verbose)
         return None
 
-    def set_velocity_params_single(self, channel=None, max_vel=None, acc=None, verbose=False):
-        """Set velocity parameters for a single channel.
-
-        Args:
-            channel (str or int, optional): Channel name or number. Defaults to None.
-            max_vel (float or None, optional): Maximum velocity. Defaults to None.
-            acc (float or None, optional): Acceleration. Defaults to None.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
+    def set_velocity_params_single(
+        self, channel=None, max_vel=None, acc=None, verbose=False
+    ):
         """
+        Set velocity parameters for a single channel.
+
+        Parameters
+        ----------
+        channel : str or int, default None
+            Channel name or number.
+        max_vel : float or None, default None
+            Maximum velocity.
+        acc : float or None, default None
+            Acceleration.
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
-        
+
         if max_vel is not None:
             if isinstance(max_vel, (int, float)):
                 max_vel = Decimal(max_vel)
         else:
-            max_vel = self.channels[chan_idx].GetVelocityParams().MaxVelocity  # If no max vel is given, take the one that is already set
+            # If no max vel is given, take the one that is already set
+            max_vel = self.channels[chan_idx].GetVelocityParams().MaxVelocity
 
         if acc is not None:
             if isinstance(acc, (int, float)):
                 acc = Decimal(acc)
         else:
-            acc = self.channels[chan_idx].GetVelocityParams().Acceleration  # If no acceleration is given, take the one that is already set
+            # If no acceleration is given, take the one that is already set
+            acc = self.channels[chan_idx].GetVelocityParams().Acceleration
 
         try:
             self.channels[chan_idx].SetVelocityParams(max_vel, acc)
         except Exception as e:
-            print(f"Exception setting velocity params for channel {channel}: {e}")
-        
+            print(
+                f'Exception setting velocity params for channel {channel}: {e}'
+            )
+
         if verbose:
-            print(f'Velocity parameters for channel {channel} set at:\n',
-                f'Max vel {str(self.channels[chan_idx].GetVelocityParams().MaxVelocity)} mm/s\n',
-                f'Acceleration: {str(self.channels[chan_idx].GetVelocityParams().Acceleration)} mm/s2')
+            max_vel = self.channels[chan_idx].GetVelocityParams().MaxVelocity
+            acc = self.channels[chan_idx].GetVelocityParams().Acceleration
+            print(f'Velocity parameters for channel {channel} set at:')
+            print(f'Max vel {str(max_vel)} mm/s')
+            print(f'Acceleration: {str(acc)} mm/s²')
         return None
 
     def print_position(self):
         """Print the current position of the device."""
+        # TODO: Write a test
         name = self.channel_names
         position = self.get_position()
         print(f'Device position: channels {name} - {position} mm')
@@ -916,6 +1110,7 @@ class BBD30XController:
         Decimal
             Current position of the channel.
         """
+        # TODO: Write a test
         return self.channels[self._get_channel_idx(channel)].Position
 
     def get_position_channel(self, channel, verbose=False):
@@ -934,27 +1129,38 @@ class BBD30XController:
         float
             Current position of the channel.
         """
+        # TODO: Write a test
         pos = self._decimal_to_float(self.get_position_decimal(channel))
         if verbose:
             print(f'Channel {channel} is in position {pos} mm')
         return pos
 
     def get_velocity_params(self, channel, verbose=False):
-        """Get the velocity parameters of a single channel.
-
-        Args:
-            channel (str or int): Channel name or number.
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
-
-        Returns:
-            tuple: Tuple of acceleration and maximum velocity.
         """
-        velParams = self.channels[self._get_channel_idx(channel)].GetVelocityParams()
+        Get the velocity parameters of a single channel.
+
+        Parameters
+        ----------
+        channel : str or int
+            Channel name or number.
+        verbose : bool, default False
+            Whether to print additional information.
+
+        Returns
+        -------
+        tuple
+            Tuple of acceleration and maximum velocity.
+        """
+        # TODO: Write a test
+        this_channel = self.channels[self._get_channel_idx(channel)]
+        velParams = this_channel.GetVelocityParams()
         if verbose:
-            print(f"Channel {channel} velocity parameters are:\n")
-            print(f"Acceleration: {velParams.Acceleration} mm/s2")
-            print(f"MaxVelocity: {velParams.MaxVelocity} mm/s")
-        return self._decimal_to_float(velParams.MaxVelocity), self._decimal_to_float(velParams.Acceleration)
+            print(f'Channel {channel} velocity parameters are:')
+            print(f'Acceleration: {velParams.Acceleration} mm/s²')
+            print(f'MaxVelocity: {velParams.MaxVelocity} mm/s')
+        max_vel = self._decimal_to_float(velParams.MaxVelocity)
+        acc = self._decimal_to_float(velParams.Acceleration)
+        return max_vel, acc
 
     def get_position(self, verbose=False):
         """
@@ -970,6 +1176,7 @@ class BBD30XController:
         list
             List of current positions for each channel.
         """
+        # TODO: Write a test
         pos = [
             self.get_position_channel(chan, verbose=verbose)
             for chan in self.channel_names
@@ -977,22 +1184,30 @@ class BBD30XController:
         return pos
 
     def disconnect(self, verbose=False):
-        """Disconnect the device.
-
-        Args:
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
         """
+        Disconnect the device.
+
+        Parameters
+        ----------
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        # TODO: Write a test
         self.device.Disconnect()
         if verbose:
-            print(f"Device {self.name} is DISCONNECTED")
+            print(f'Device {self.name} is DISCONNECTED')
         return None
 
     def finish(self, verbose=False):
-        """Stop polling and disconnect the device.
-
-        Args:
-            verbose (bool, optional): Whether to print additional information. Defaults to False.
         """
+        Stop polling and disconnect the device.
+
+        Parameters
+        ----------
+        verbose : bool, default False
+            Whether to print additional information.
+        """
+        # TODO: Write a test
         self.stop_polling_channels(verbose=verbose)
         self.disconnect(verbose=verbose)
 
@@ -1010,6 +1225,7 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
+        # TODO: Write a test
         self.start_polling_channels(verbose=verbose)
         self.enable_channels(verbose=verbose)
         if home:
@@ -1024,6 +1240,7 @@ class BBD30XController:
         Returns:
             bool: True if the channel is enabled, False otherwise.
         """
+        # TODO: Write a test
         return channel.IsEnabled
 
     def channel_IsHomed(self, channel):
@@ -1035,6 +1252,7 @@ class BBD30XController:
         Returns:
             bool: True if the channel is homed, False otherwise.
         """
+        # TODO: Write a test
         return channel.Status.IsHomed
 
     def channel_IsHoming(self, channel):
@@ -1046,6 +1264,7 @@ class BBD30XController:
         Returns:
             bool: True if the channel is homing, False otherwise.
         """
+        # TODO: Write a test
         return channel.Status.IsHoming
 
     def channel_IsInMotion(self, channel):
@@ -1057,6 +1276,7 @@ class BBD30XController:
         Returns:
             bool: True if the channel is in motion, False otherwise.
         """
+        # TODO: Write a test
         return channel.Status.IsInMotion
 
     def channel_Position(self, channel):
@@ -1068,6 +1288,7 @@ class BBD30XController:
         Returns:
             Decimal: Current position in Real World Units.
         """
+        # TODO: Write a test
         return channel.Position
 
     def channel_Velocity(self, channel):
@@ -1079,6 +1300,7 @@ class BBD30XController:
         Returns:
             float: Current velocity.
         """
+        # TODO: Write a test
         return channel.Status.Velocity
 
     def channel_IsSettled(self, channel):
@@ -1090,10 +1312,12 @@ class BBD30XController:
         Returns:
             bool: True if the channel is settled, False otherwise.
         """
+        # TODO: Write a test
         return channel.Status.IsSettled
 
     def test_basic(self):
         """Test basic functionality of the device."""
+        # TODO: Write a test
         self.standard_initialize_channels(home=False, verbose=True)
         self.print_position()
         self.print_velocity_params()
