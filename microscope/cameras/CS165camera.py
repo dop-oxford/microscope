@@ -78,8 +78,7 @@ class CS165CUCamera(microscope.abc.Camera):
         self.camera_name = camera_name
 
         # TODO: we can't hard set the trigger mode really
-        self._trigger_type = microscope.TriggerType.SOFTWARE
-        self._trigger_mode = microscope.TriggerMode.ONCE
+        self._trigger_mode = "software"
         self._acquiring = False
         self._triggered = 0
         self._sent = 0
@@ -523,11 +522,10 @@ class CS165CUCamera(microscope.abc.Camera):
             self.camera.biny = binning.v
 
     # TODO: replace this with add sedtting
-    def set_trigger(self, ttype, tmode):
-        """set the trigger type and mode of the camera."""
+    def set_trigger(self, trigger_mode):
+        """set the trigger mode of the camera."""
         # TODO: this probably is not right
-        self._trigger_type = ttype
-        self._trigger_mode = tmode
+        self._trigger_mode = trigger_mode
 
     @property
     def trigger_mode(self) -> microscope.TriggerMode:
