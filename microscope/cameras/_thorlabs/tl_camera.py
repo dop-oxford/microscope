@@ -2,6 +2,7 @@
 """
 tl_camera.py
 """
+import traceback
 
 from ctypes import (
     cdll,
@@ -219,7 +220,11 @@ class TLCameraSDK(object):
 
         try:
             if platform.system() == "Windows":
+                print("PLATFORM IS WINDOWS")
                 self._sdk = cdll.LoadLibrary(r"thorlabs_tsi_camera_sdk.dll")
+                print(dir(self._sdk))
+                print(self._sdk._name)
+                print("DLL LOADED")
             elif platform.system() == "Linux":
                 try:
                     self._sdk = cdll.LoadLibrary(
@@ -245,18 +250,35 @@ class TLCameraSDK(object):
                 "PATH. Make sure to use 32-bit libraries when using a 32-bit python interpreter "
                 "and 64-bit libraries when using a 64-bit interpreter.\n"
             )
+        print("SDK INITIALIZATION STARTED!")
+        try:
+            print(self._sdk)
+        except Exception as exception:
+            _logger.error("SDK failing here; " + str(exception))
+            raise exception
+        if hasattr(self._sdk, 'tl_camera_open_sdk'):
+            print("The method tl_camera_open_sdk() exists in _sdk.")
+        else:
+            print("The method tl_camera_open_sdk() does NOT exist in _sdk.")
 
-        error_code = self._sdk.tl_camera_open_sdk()
+        try:
+            error_code = self._sdk.tl_camera_open_sdk()
+        except Exception as exception:
+            _logger.error("SDK initialization failing here; " + str(exception))
+            _logger.error("Traceback: " + traceback.format_exc())  # Log the full traceback
+            raise exception
+        
         if error_code != 0:
             raise TLCameraError(
                 "tl_camera_open_sdk() returned error code: {error_code}\n".format(
                     error_code=error_code
                 )
             )
+        
         TLCameraSDK._is_sdk_open = True
         self._current_camera_connect_callback = None
         self._current_camera_disconnect_callback = None
-
+        
         try:
             """set C function argument types"""
             self._sdk.tl_camera_discover_available_cameras.argtypes = [
@@ -646,7 +668,8 @@ class TLCameraSDK(object):
         except Exception as exception:
             _logger.error("SDK initialization failed; " + str(exception))
             raise exception
-
+        print("SDK INITIALIZATION COMPLETED!")
+        
     def __del__(self):
         self.dispose()
 

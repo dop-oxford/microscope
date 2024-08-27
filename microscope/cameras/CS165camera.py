@@ -72,9 +72,9 @@ class CS165CUCamera(microscope.abc.Camera):
 
         try:
             # TODO: this obviously needs a proper solution:
-            os.add_dll_directory(
-                "C:\Program Files\Thorlabs\Scientific Imaging\ThorCam"
-            )
+            absolute_path_to_dlls = r"C:\Users\AlvaroFG\Documents\GitHub\microscope\microscope\cameras\_thorlabs\dlls\64_lib"
+            os.environ['PATH'] = absolute_path_to_dlls + os.pathsep + os.environ['PATH']
+            os.add_dll_directory(absolute_path_to_dlls)
         except:
             pass
         
@@ -122,10 +122,17 @@ class CS165CUCamera(microscope.abc.Camera):
         self.camera_name = camera_name
         try:  # TODO: This is a hack that needs removed later.
             self.sdk = TLCameraSDK()
-            self.camera_list = self.sdk.discover_available_cameras()
-        except:
+        except Exception as exception:
             self.sdk = {}
+            print(exception)
+            warnings.warn("SDK not working")
+            
+        try:  # TODO: This is a hack that needs removed later.
+            self.camera_list = self.sdk.discover_available_cameras()
+            print(f"Cameras found: {self.camera_list}")
+        except:
             self.camera_list = None
+            warnings.warn("No cameras have been found")
 
         if not self.camera_list:
             self.simulated = True
@@ -1002,7 +1009,5 @@ class CS165CUBRCamera(CS165CUCamera):
 
 
 if __name__ == "__main__":
-    camera = CS165CUCamera(simulated=True)
-    camera2 = CS165CUBRCamera(simulated=True)
+    camera = CS165CUCamera(simulated=False)
     print(camera._fetch_data())
-    print(camera2._fetch_data())
