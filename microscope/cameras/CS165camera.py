@@ -473,36 +473,36 @@ class CS165CUCamera(microscope.abc.Camera):
             return self._simulated_settings.get('exposure_time', 0.1)  # Default simulated exposure time in seconds
         return self.camera.exposure_time_us * 1e-6
 
-    def set_exposure_time(self, exposure_time):
+    def set_exposure_time(self, value):
         """Sets camera exposure time in seconds.
 
         Args:
             exposure_time (float): Camera exposure time in seconds.
         """
         if self.simulated:
-            self._simulated_settings['exposure_time'] = exposure_time
+            self._simulated_settings['exposure_time'] = value
         else:
-            self.set_exposure_time_us(exposure_time * 1e6)
+            self.set_exposure_time_us(value * 1e6)
 
-    def set_exposure_time_us(self, exposure_time_us):
+    def set_exposure_time_us(self, value):
         """Sets camera exposure time in microseconds.
 
         Args:
             exposure_time_us (int): Camera exposure time in us.
         """
         if self.simulated:
-            self._simulated_settings['exposure_time_us'] = exposure_time_us
+            self._simulated_settings['exposure_time_us'] = value
         else:
             try:
-                self.camera.exposure_time_us = exposure_time_us
+                self.camera.exposure_time_us = value
             except Exception as error:
                 print(
-                    f"Encountered error: {error}, exposure time us could not be set to {exposure_time_us} us."
+                    f"Encountered error: {error}, exposure time us could not be set to {value} us."
                 )
                 self.dispose()
             if self.verbose:
                 print(
-                    f"Camera exposure time has been set to {exposure_time_us} us."
+                    f"Camera exposure time has been set to {value} us."
                 )
 
     def _get_binning(self):
