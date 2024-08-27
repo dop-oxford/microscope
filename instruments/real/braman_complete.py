@@ -44,6 +44,9 @@ DEVICES = [
         host="127.0.0.1",
         port=8003,
         conf= {
+            "relative_path_to_dlls": os.path.join(
+                "cameras", "_thorlabs", "dlls", "64_lib"
+            ),
             "simulated": True,
         }
     ),
@@ -52,6 +55,9 @@ DEVICES = [
         host="127.0.0.1",
         port=8004,
         conf= {
+            "relative_path_to_dlls": os.path.join(
+                "cameras", "_thorlabs", "dlls", "64_lib"
+            ),
             "simulated": True,
         }
     )

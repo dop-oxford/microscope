@@ -24,8 +24,7 @@ DEVICES = [
                 "reverse": True,
                 "verbose": True,
                 "very_verbose": True,
-                "unit": "mm",
-                "simulated": True,
+                "unit": "mm"
             }
     ),
     device(
@@ -37,8 +36,7 @@ DEVICES = [
             "channel": 1,
             "stage_name": "MLS2032",
             "reverse": True,
-            "unit": "mm",
-            "simulated": True,
+            "unit": "mm"
         }
     ),
     device(
@@ -46,6 +44,7 @@ DEVICES = [
         host="127.0.0.1",
         port=8003,
         conf= {
+            "relative_path_to_dlls": None,
             "simulated": True,
         }
     ),
@@ -54,6 +53,7 @@ DEVICES = [
         host="127.0.0.1",
         port=8004,
         conf= {
+            "relative_path_to_dlls": None,
             "simulated": True,
         }
     )

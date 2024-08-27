@@ -53,6 +53,7 @@ class CS165CUCamera(microscope.abc.Camera):
 
     def __init__(
         self,
+        relative_path_to_dlls=None,
         camera_number=None,  # The number in the list of cameras of the camera we want to get
         camera_name=None,  # Name of camera
         ini_acq=False,  # Whether to initialize the acquisition with the default values
@@ -71,12 +72,13 @@ class CS165CUCamera(microscope.abc.Camera):
         )
 
         try:
-            # TODO: this obviously needs a proper solution:
-            absolute_path_to_dlls = r"C:\Users\AlvaroFG\Documents\GitHub\microscope\microscope\cameras\_thorlabs\dlls\64_lib"
+            # setup the path to the DLLs
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            absolute_path_to_dlls = os.path.join(project_root, relative_path_to_dlls)
             os.environ['PATH'] = absolute_path_to_dlls + os.pathsep + os.environ['PATH']
             os.add_dll_directory(absolute_path_to_dlls)
-        except:
-            pass
+        except Exception as exception:
+            _logger.error("Could not set path to DLLs: %s", str(exception))
         
         # TODO: we can't hard set the trigger mode really
         self._trigger_mode = "software"

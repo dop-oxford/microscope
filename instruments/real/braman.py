@@ -1,3 +1,4 @@
+import os
 from microscope.device_server import device
 from microscope.simulators import SimulatedCamera
 from microscope.controllers.mcm3000 import MCM3000Controller
@@ -11,8 +12,11 @@ DEVICES = [
         CS165CUCamera,
         host="127.0.0.1",
         port=8000,
-        conf= {
+        conf={
+            "relative_path_to_dlls": os.path.join(
+                "cameras", "_thorlabs", "dlls", "64_lib"
+            ),
             "simulated": False,
-        }
+        },
     )
 ]
