@@ -17,6 +17,8 @@ DEVICES = [
             "relative_path_to_dlls": os.path.join(
                 "cameras", "_thorlabs", "dlls", "64_lib"
             ),
+            "camera_name": "CS165CUCamera_Name",
+            "ini_acq": False, 
             "logger_level": logging.DEBUG,
             "simulated": False,
         },
