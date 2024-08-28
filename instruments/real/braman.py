@@ -1,4 +1,5 @@
 import os
+import logging
 from microscope.device_server import device
 from microscope.simulators import SimulatedCamera
 from microscope.controllers.mcm3000 import MCM3000Controller
@@ -16,6 +17,7 @@ DEVICES = [
             "relative_path_to_dlls": os.path.join(
                 "cameras", "_thorlabs", "dlls", "64_lib"
             ),
+            "logger_level": logging.DEBUG,
             "simulated": False,
         },
     )

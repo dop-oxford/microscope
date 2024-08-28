@@ -214,6 +214,7 @@ class CS165CUCamera(microscope.abc.Camera):
         :return: The current cycle time in seconds.
         :rtype: float
         """
+        _logger.debug("HOLA GET CYCLE TIME")
         if self.simulated:
             return self._simulated_settings.get('cycle_time', 0.2)  # Default simulated cycle time
         try:
@@ -229,6 +230,7 @@ class CS165CUCamera(microscope.abc.Camera):
         :param cycle_time_value: The desired cycle time in seconds.
         :type: float
         """
+        _logger.debug("HOLA SET CYCLE TIME")
         if self.simulated:
             self._simulated_settings['cycle_time'] = cycle_time_value
         else:
@@ -244,6 +246,7 @@ class CS165CUCamera(microscope.abc.Camera):
 
     def _do_shutdown(self):
         """Cleans up the TLCameraSDK and TLCamera instances."""
+        _logger.debug("HOLA Do SHUTDOWN")
         if self.simulated:
             return
         if self._is_color:
@@ -292,6 +295,7 @@ class CS165CUCamera(microscope.abc.Camera):
         Returns:
             list: Sensor dimensions [height, width] in pixels.
         """
+        _logger.debug("HOLA GET SENSOR SHAPE")
         if self.simulated:
             return self._simulated_settings.get('sensor_shape', [512, 512])  # Default simulated sensor shape
         return [
@@ -305,6 +309,7 @@ class CS165CUCamera(microscope.abc.Camera):
         Returns:
             list: Pixel dimensions [height, width] in micrometers (um).
         """
+        _logger.debug("HOLA GET PIXEL SIZE")
         if self.simulated:
             return self._simulated_settings.get('pixel_size', [6.5, 6.5])  # Default simulated pixel size in um
         return [
@@ -456,6 +461,7 @@ class CS165CUCamera(microscope.abc.Camera):
 
     def get_exposure_time(self) -> float:
         """Get exposure time in seconds."""
+        _logger.debug("HOLA GET EXPOSURE TIME")
         if self.simulated:
             return self._simulated_settings.get('exposure_time', 0.1)  # Default simulated exposure time in seconds
         return self.camera.exposure_time_us * 1e-6
@@ -466,10 +472,12 @@ class CS165CUCamera(microscope.abc.Camera):
         Args:
             exposure_time (float): Camera exposure time in seconds.
         """
+        _logger.debug("HOLA SET EXPOSURE TIME")
         if self.simulated:
             self._simulated_settings['exposure_time'] = value
         else:
-            self.set_exposure_time_us(value * 1e6)
+            #self.set_exposure_time_us(int(value) * 1e6)
+            self.set_exposure_time_us(10000)
 
     def set_exposure_time_us(self, value):
         """Sets camera exposure time in microseconds.
@@ -477,6 +485,7 @@ class CS165CUCamera(microscope.abc.Camera):
         Args:
             exposure_time_us (int): Camera exposure time in us.
         """
+        _logger.debug("HOLA SET EXPOSURE TIME US")
         if self.simulated:
             self._simulated_settings['exposure_time_us'] = value
         else:
@@ -493,6 +502,7 @@ class CS165CUCamera(microscope.abc.Camera):
 
     def _get_binning(self):
         """Returns the binning of the camera."""
+        _logger.debug("HOLA GET BINNING")
         if self.simulated:
             return self._simulated_settings.get('binning', microscope.Binning(1, 1))  # Default binning if not set
         h = self.camera.binx
@@ -501,6 +511,7 @@ class CS165CUCamera(microscope.abc.Camera):
 
     def _set_binning(self, binning: microscope.Binning):
         """Sets the binning of the camera."""
+        _logger.debug("HOLA SET BINNING")
         if self.simulated:
             self._simulated_settings['binning'] = binning
         else:
@@ -536,6 +547,7 @@ class CS165CUCamera(microscope.abc.Camera):
         Args:
             roi (tuple): Region of interest (x, y, width, height).
         """
+        _logger.debug("HOLA SET ROI")
         if self.simulated:
             self._simulated_settings['roi'] = roi  # Store ROI in simulated settings
             _logger.info("Simulated camera region of interest has been set to %s", str(roi))
@@ -552,6 +564,7 @@ class CS165CUCamera(microscope.abc.Camera):
 
     def _set_gain(self, value):
         """Sets the gain of the camera."""
+        _logger.debug("HOLA SET GAIN")
         if self.simulated:
             self._simulated_settings['gain'] = value  # Store gain in simulated settings
         else:
@@ -563,12 +576,14 @@ class CS165CUCamera(microscope.abc.Camera):
         Returns:
             tuple: Region of interest (x, y, width, height).
         """
+        _logger.debug("HOLA GET ROI")
         if self.simulated:
             return self._simulated_settings.get('roi', (0, 0, 512, 512))  # Default simulated ROI
         return self.camera.roi
 
     def set_continuous_mode(self):
         """Sets camera to continuous mode."""
+        _logger.debug("HOLA SET CONTINUOUS MODE")
         if self.simulated:
             return
         if self.camera.frames_per_trigger_zero_for_unlimited != 0:
@@ -586,6 +601,7 @@ class CS165CUCamera(microscope.abc.Camera):
     ):
         """Initializes camera acquisition with specified parameters."""
         # Increment the trigger
+        _logger.debug("HOLA DO TRIGGER")
         self._triggered += 1
         if self.simulated:
             return
@@ -628,13 +644,15 @@ class CS165CUCamera(microscope.abc.Camera):
             target_bpp (int): Target bit depth for rescaling.
 
         Returns:
-            Image: PIL Image object.
+            Image (numpy.ndarray): PIL Image object.
         """
+        
         if self._acquiring and self._triggered > 0:
+            _logger.debug("HOLA FETCH DATA")
             _logger.info("Sending image")
             # TODO: Idk why this was here but we can look into it, just commented now to speed up things
             #time.sleep(self.get_cycle_time())
-            if self.simulated:
+            if True: #self.simulated:
                 dark = int(32 * np.random.rand())
                 light = int(255 - 128 * np.random.rand())
                 width = self.get_roi().width
@@ -644,10 +662,11 @@ class CS165CUCamera(microscope.abc.Camera):
                 )
                 self._sent += 1
                 self._triggered -= 1
+                print(type(image))
                 return image
             self._triggered -= 1
             print("THIS SHOULD BE AN IMAGE")
-            return self.get_color_image()
+            return np.array(self.get_color_image())
         
             # TODO -> This is just a temporary hack, with this it cannot rescale
             frame = self.get_frame()
