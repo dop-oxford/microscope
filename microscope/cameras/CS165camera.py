@@ -57,8 +57,7 @@ class CS165CUCamera(microscope.abc.Camera):
         camera_number=None,  # The number in the list of cameras of the camera we want to get
         camera_name=None,  # Name of camera
         ini_acq=False,  # Whether to initialize the acquisition with the default values
-        verbose=True,  # If True, info in printed in terminal
-        very_verbose=False,
+        logger_level = logging.INFO,
         simulated=False,
     ):  # If True, more info in printed in terminal
         super().__init__()
@@ -71,10 +70,9 @@ class CS165CUCamera(microscope.abc.Camera):
             lambda: (0, 8192),
         )
 
+        _logger.setLevel(logger_level)
         self.relative_path_to_dlls = relative_path_to_dlls
         self.simulated = simulated
-        self.verbose = verbose
-        self.very_verbose = very_verbose
         self.camera_name = camera_name
 
         # TODO: we can't hard set the trigger mode really
@@ -285,8 +283,7 @@ class CS165CUCamera(microscope.abc.Camera):
                 f"Encountered error: {error}, camera name could not be set to {camera_name}."
             )
             self.dispose()
-        if self.verbose:
-            print(f"Camera name has been set to {camera_name}.")
+        _logger.info("Camera name has been set to %s", camera_name)
 
     def _get_sensor_shape(self):
         """Returns sensor dimensions in pixels.
@@ -371,27 +368,27 @@ class CS165CUCamera(microscope.abc.Camera):
     def set_color_processor_properties(
         self,
         color_space=COLOR_SPACE.SRGB,
-        output_format=FORMAT.RGB_PIXEL,
-        verbose=False,
+        output_format=FORMAT.RGB_PIXEL
     ):
         """Sets properties of color processor.
 
         Args:
             color_space (COLOR_SPACE): Color space. Default is COLOR_SPACE.SRGB.
-            output_format (FORMAT): Output format. Default is FORMAT.RGB_PIXEL.
-            verbose (bool): If True, print information to terminal.
+            output_format (FORMAT): Output format. Default is FORMAT.RGB_PIXEL
         """
         self.mono_to_color_processor.color_space = color_space
         self.mono_to_color_processor.output_format = output_format
-        if verbose:
-            print("Color processor properties set to:")
-            self.get_color_processor_properties(verbose=True)
+        
+        color_properties = self.get_color_processor_properties()
+        gain_properties = self.get_color_processor_gains()
+        _logger.info("Color processor properties set to:")
+        _logger.info(list(color_properties.items()))
+        _logger.info(
+                "Color gains: R %f - G %f - B %f", gain_properties[0], gain_properties[1], gain_properties[2]
+            )
 
-    def get_color_processor_gains(self, verbose=False):
+    def get_color_processor_gains(self):
         """Gets RGB gains of color processor.
-
-        Args:
-            verbose (bool): If True, print information to terminal.
 
         Returns:
             list: List with RGB gains.
@@ -399,17 +396,10 @@ class CS165CUCamera(microscope.abc.Camera):
         red_gain = self.mono_to_color_processor.red_gain
         green_gain = self.mono_to_color_processor.green_gain
         blue_gain = self.mono_to_color_processor.blue_gain
-        if verbose:
-            print(
-                f"Color gains: R {red_gain} - G {green_gain} - B {blue_gain}"
-            )
         return [red_gain, green_gain, blue_gain]
 
-    def get_color_processor_properties(self, verbose=True):
+    def get_color_processor_properties(self):
         """Gets properties of color processor.
-
-        Args:
-            verbose (bool): If True, print information to terminal.
 
         Returns:
             dict: Dictionary with color processor properties.
@@ -420,10 +410,6 @@ class CS165CUCamera(microscope.abc.Camera):
             self.mono_to_color_processor.output_format,
         ]
         props = dict(zip(keys, values))  # Dictionary with properties
-        if verbose:
-            print("Color processor properties:")
-            print(list(props.items()))
-            self.get_color_processor_gains(verbose=True)
         return props
 
     # --- Camera configuration functions ---
@@ -440,10 +426,10 @@ class CS165CUCamera(microscope.abc.Camera):
                 f"Encountered error: {error}, image poll timeout could not be set to {image_poll_timeout_ms} ms."
             )
             self.dispose()
-        if self.verbose:
-            print(
-                f"Camera image poll timeout has been set to {image_poll_timeout_ms} ms."
-            )
+
+        _logger.info(
+            f"Camera image poll timeout has been set to ms.", image_poll_timeout_ms
+        )
 
     def set_frames_per_trigger_zero_for_unlimited(
         self, frames_per_trigger_zero_for_unlimited
@@ -458,13 +444,13 @@ class CS165CUCamera(microscope.abc.Camera):
                 frames_per_trigger_zero_for_unlimited
             )
         except Exception as error:
-            print(
-                f"Encountered error: {error}, number of frames generated per software or hardware trigger could not be set to {frames_per_trigger_zero_for_unlimited}."
+            _logger.error(
+                "Encountered error: %s, number of frames generated per software or hardware trigger could not be set to %d",
+                str(error), frames_per_trigger_zero_for_unlimited
             )
             self.dispose()
-        if self.verbose:
-            print(
-                f"Camera number of frames generated per software or hardware trigger have been set to {frames_per_trigger_zero_for_unlimited}."
+        _logger.info(
+                "Camera number of frames generated per software or hardware trigger have been set to %d",frames_per_trigger_zero_for_unlimited
             )
 
     def get_exposure_time(self) -> float:
@@ -500,9 +486,8 @@ class CS165CUCamera(microscope.abc.Camera):
                     f"Encountered error: {error}, exposure time us could not be set to {value} us."
                 )
                 self.dispose()
-            if self.verbose:
-                print(
-                    f"Camera exposure time has been set to {value} us."
+            _logger.info(
+                    "Camera exposure time has been set to %d us.", value
                 )
 
     def _get_binning(self):
@@ -545,16 +530,15 @@ class CS165CUCamera(microscope.abc.Camera):
         """
         if self.simulated:
             self._simulated_settings['roi'] = roi  # Store ROI in simulated settings
-            if self.verbose:
-                print(f"Simulated camera region of interest has been set to {roi}")
+            _logger.info("Simulated camera region of interest has been set to %s", str(roi))
         else:
             try:
                 self.camera.roi = roi
-                if self.verbose:
-                    print(f"Camera region of interest has been set to {roi}")
+                _logger.info("Camera region of interest has been set to %s", str(roi))
             except Exception as error:
-                print(
-                    f"Encountered error: {error}, region of interest could not be set to {roi}."
+                _logger.error(
+                    "Encountered error: %s, region of interest could not be set to %s.",
+                    str(error), str(roi)
                 )
                 self.dispose()
 
@@ -584,24 +568,20 @@ class CS165CUCamera(microscope.abc.Camera):
                 self.set_frames_per_trigger_zero_for_unlimited(
                     0
                 )  # start camera in continuous mode
-                if self.verbose:
-                    print(f"Camera set to continuous mode.")
+                _logger.info("Camera set to continuous mode.")
             except Exception as error:
-                print(
-                    f"Encountered error: {error}, camera could not be set to continuous mode."
-                )
+                _logger.error("Encountered error: {%s, camera could not be set to continuous mode.", str(error))
                 self.dispose()
 
     def _do_trigger(
-        self, exp_time_us=11000, poll_timeout_ms=1000, verbose=False
+        self, exp_time_us=11000, poll_timeout_ms=1000
     ):
         """Initializes camera acquisition with specified parameters."""
         # Increment the trigger
         self._triggered += 1
         if self.simulated:
             return
-        if verbose:
-            print(f"Initializing {self.camera_name} camera acquisition")
+        _logger.info("Initializing {self.camera_name} camera acquisition")
         self.set_exposure_time_us(exp_time_us)  # set exposure in us
         self.set_continuous_mode()  # start camera in continuous mode
         self.set_image_poll_timeout_ms(
@@ -611,8 +591,7 @@ class CS165CUCamera(microscope.abc.Camera):
             self.camera.arm(2)
         self.camera.issue_software_trigger()
         self.acq_initialized = True
-        if verbose:
-            print(f"{self.camera_name} camera acquisition initialized")
+        _logger.info("%s camera acquisition initialized", self.camera_name)
 
     # --- Image acquisition functions ---
     def get_frame(self, disarm=False):
@@ -682,11 +661,13 @@ class CS165CUCamera(microscope.abc.Camera):
         """
         frame = self.get_frame()
 
-        if self.very_verbose:
-            print(
-                f"Red Gain = {self.mono_to_color_processor.red_gain}\n"
-                f"Green Gain = {self.mono_to_color_processor.green_gain}\n"
-                f"Blue Gain = {self.mono_to_color_processor.blue_gain}\n"
+        _logger.info(
+                "Red Gain = %f\n"
+                "Green Gain = %f\n"
+                "Blue Gain = %f\n",
+                self.mono_to_color_processor.red_gain,
+                self.mono_to_color_processor.green_gain,
+                self.mono_to_color_processor.blue_gain
             )
 
         if transform_key == "48":
@@ -984,34 +965,28 @@ class CS165CUBRCamera(CS165CUCamera):
             )
         return CS165CUCamera.get_color_image(self, transform_key="48")
 
-    def _close(self, force=False, verbose=True):
+    def _close(self, force=False):
         """
         Closes the camera, ensuring any necessary cleanup is performed.
 
         Args:
             force (bool): Forces closure. Defaults to False.
-            verbose (bool): If True, enables verbose output during the operation.
 
         """
         super().dispose(self)
 
-    def _initialize(self, verbose=True):
+    def _initialize(self):
         """
         Initializes the camera.
 
         Prepares the camera for operation, if needed.
-
-        Args:
-            verbose (bool): If True, enables verbose output during the operation.
-
+        
         """
-        if verbose:
-            print(f"Initializing camera {self.name}...")
+        _logger.info("Initializing camera %s...", self.name)
         super().initialize_acquisition(
-            self, exp_time_us=11000, poll_timeout_ms=1000, verbose=True
+            self, exp_time_us=11000, poll_timeout_ms=1000
         )
-        if verbose:
-            print(f"Camera {self.name} INITIALIZED.")
+        _logger.info("Camera %s INITIALIZED.", self.name)
 
     def set_gain_dB(self, gain):
         """

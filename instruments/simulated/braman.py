@@ -1,4 +1,5 @@
 import os
+import logging
 from microscope.device_server import device
 from microscope.simulators import SimulatedCamera
 from microscope.controllers.mcm3000 import MCM3000Controller
@@ -14,7 +15,9 @@ DEVICES = [
         port=8000,
         conf={
             "relative_path_to_dlls": None,
+            "logger_level": logging.DEBUG,
             "simulated": True,
         },
     )
 ]
+
