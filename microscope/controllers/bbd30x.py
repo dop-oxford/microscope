@@ -15,7 +15,33 @@ Notes:
 """
 from collections.abc import Iterable
 from decimal import Decimal
+import microscope.abc
 import time
+import typing
+
+
+class SimulatedDeviceInfo:
+    def __init__(
+        self, description, serial_no, device_type, hardware_version,
+        firmware_version
+    ):
+        self.Description = description
+        self.SerialNumber = serial_no
+        self.DeviceType = device_type
+        self.HardwareVersion = hardware_version
+        self.FirmwareVersion = firmware_version
+
+
+class SimulatedChannelInfo:
+    def __init__(
+        self, description, serial_no, device_type, hardware_version,
+        firmware_version
+    ):
+        self.Description = description
+        self.SerialNumber = serial_no
+        self.DeviceType = device_type
+        self.HardwareVersion = hardware_version
+        self.FirmwareVersion = firmware_version
 
 
 class SimulatedVelocityParams:
@@ -41,17 +67,12 @@ class SimulatedChannel:
         self.MaxVelocity = max_velocity
         self.MinVelocity = min_velocity
         self.MotorDeviceSettings = 'Simulated Motor Device Settings'
-        self.IsEnabled = True
-        self.Position = 0.0
-
-    def GetDeviceInfo(self):
-        return DeviceInfo(
-            description=self.Description,
-            serial_no=self.SerialNumber,
-            device_type=self.DeviceType,
-            hardware_version=self.HardwareVersion,
-            firmware_version=self.FirmwareVersion
-        )
+        self.IsEnabled = False
+        self.Position = 5
+        self.DeviceID = None
+        self.NeedsHoming = True
+        self.CanHome = True
+        self.Status = self.Status()
 
     def GetVelocityParams(self):
         return SimulatedVelocityParams(
@@ -60,39 +81,54 @@ class SimulatedChannel:
             min_velocity=self.MinVelocity
         )
 
+    def SetVelocityParams(self, max_vel, acc):
+        self.Acceleration = acc
+        self.MaxVelocity = max_vel
+
     def IsSettingsInitialized(self):
         return True
+
+    def EnableDevice(self):
+        self.IsEnabled = True
+
+    def DisableDevice(self):
+        self.IsEnabled = False
 
     def StartPolling(self, pol_rate):
         pass
 
+    def StopPolling(self):
+        pass
+
+    def LoadMotorConfiguration(self, device_id):
+        pass
+
+    def SetSettings(self, device_settings, verbose=False):
+        self.MotorDeviceSettings = device_settings
+        if verbose:
+            print(f'Settings set to {device_settings}')
+
+    def GetChannelInfo(self):
+        return SimulatedChannelInfo(
+            description=self.Description,
+            serial_no=self.SerialNumber,
+            device_type=self.DeviceType,
+            hardware_version=self.HardwareVersion,
+            firmware_version=self.FirmwareVersion
+        )
+
+    def Home(self, timeout):
+        self.Status.IsHomed = True
+
+    def MoveTo(self, target_pos, timeout):
+        self.Position = target_pos
+
+    class Status:
+        def __init__(self):
+            self.IsHomed = False
+
 
 class SimulatedDevice:
-    def __init__(self):
-        self.channels = [
-            SimulatedChannel(
-                description='Simulated Channel 1',
-                serial_no='1',
-                device_type='Simulated Channel',
-                hardware_version='Simulated Hardware',
-                firmware_version='Simulated Firmware'
-            ),
-            SimulatedChannel(
-                description='Simulated Channel 2',
-                serial_no='2',
-                device_type='Simulated Channel',
-                hardware_version='Simulated Hardware',
-                firmware_version='Simulated Firmware'
-            ),
-        ]
-
-    def GetChannel(self, num):
-        # The channel 'num' is its index plus 1
-        idx = num - 1
-        return self.channels[idx]
-
-
-class DeviceInfo:
     def __init__(
         self, description, serial_no, device_type, hardware_version,
         firmware_version
@@ -102,9 +138,45 @@ class DeviceInfo:
         self.DeviceType = device_type
         self.HardwareVersion = hardware_version
         self.FirmwareVersion = firmware_version
+        self.channels = [
+            SimulatedChannel(
+                description='Simulated Channel 1',
+                serial_no='1',
+                device_type='Simulated Channel',
+                hardware_version='Simulated Hardware',
+                firmware_version='Simulated Firmware'
+            ),
+            SimulatedChannel(
+                description='Simulated Channel 1',
+                serial_no='1',
+                device_type='Simulated Channel',
+                hardware_version='Simulated Hardware',
+                firmware_version='Simulated Firmware'
+            ),
+        ]
+
+    def GetDeviceInfo(self):
+        return SimulatedDeviceInfo(
+            description=self.Description,
+            serial_no=self.SerialNumber,
+            device_type=self.DeviceType,
+            hardware_version=self.HardwareVersion,
+            firmware_version=self.FirmwareVersion
+        )
+
+    def GetChannel(self, num):
+        # The channel 'num' is its index plus 1
+        idx = num - 1
+        return self.channels[idx]
+
+    def Disconnect(self):
+        pass
+
+    def shutdown(self):
+        print(f'Device {self.Description} shutting down.')
 
 
-class BBD30XController:
+class BBD30XController(microscope.abc.Controller):
 
     def __init__(
         self, serial_no='103251384', name='BBD302', channel_names=('X', 'Y'),
@@ -139,14 +211,6 @@ class BBD30XController:
         self.simulated = simulated
         self.channel_names = channel_names
         self.reverse = reverse
-        
-        self.device_info = DeviceInfo(
-            description=self.name,
-            serial_no=self.serial_no,
-            device_type='Controller',
-            hardware_version='Unknown',
-            firmware_version='Unknown'
-        )
 
         # 1-indexed array of channel numbers
         self.channel_nums = range(1, len(self.channel_names) + 1)
@@ -170,7 +234,21 @@ class BBD30XController:
         )
 
         if self.simulated:
-            self.device = SimulatedDevice()
+            self.device = SimulatedDevice(
+                description='Simulated Device 1',
+                serial_no='1',
+                device_type='Simulated Device',
+                hardware_version='Simulated Hardware',
+                firmware_version='Simulated Firmware'
+            )
+            self.device_list = [self.device]
+            self.device_info = SimulatedDeviceInfo(
+                description=self.name,
+                serial_no=self.serial_no,
+                device_type='Controller',
+                hardware_version='Unknown',
+                firmware_version='Unknown'
+            )
         else:
             # Build list of connected devices
             DeviceManagerCLI.BuildDeviceList()
@@ -278,7 +356,7 @@ class BBD30XController:
         self._make_channel_iterator(channel)
         for chan in channel:
             chan_idx = self._get_channel_idx(chan)
-            channel_info = self.channels[chan_idx].GetDeviceInfo()
+            channel_info = self.channels[chan_idx].GetChannelInfo()
             print('------------------------')
             print(f'Channel {chan} Info:')
             print(f'Class: {type(self.channels[chan_idx])}')
@@ -314,13 +392,16 @@ class BBD30XController:
     def _decimal_to_float(self, decimal):
         """Convert Decimal to float.
 
-        Args:
-            decimal (Decimal): Decimal number.
+        Parameters
+        ----------
+        decimal : Decimal
+            Decimal number.
 
-        Returns:
-            float: Float number.
+        Returns
+        -------
+        float
+            Float number.
         """
-        # TODO: Write a test
         return float(str(decimal))
 
     def _get_channel_idx(self, channel):
@@ -337,7 +418,6 @@ class BBD30XController:
         int
             Index of the channel.
         """
-        # TODO: Write a test
         if isinstance(channel, int):
             assert channel in self.channel_nums, (
                 f'Channel number {channel} is not in the list of channels ' +
@@ -368,7 +448,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.get_channel_single(chan, verbose)
@@ -380,18 +459,17 @@ class BBD30XController:
             self.get_channels(self.channel_names, verbose)
         return None
 
-    def get_channel_single(self, channel=None, verbose=False):
+    def get_channel_single(self, channel, verbose=False):
         """
         Get a single channel.
 
         Parameters
         ----------
-        channel : str, int or None, default None
+        channel : str, int
             Channel name or number.
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
         if isinstance(channel, int):
             chan_num = channel
@@ -437,7 +515,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.load_config_channel_single(chan, verbose)
@@ -449,18 +526,17 @@ class BBD30XController:
             self.load_config_channels(self.channel_names, verbose)
         return None
 
-    def load_config_channel_single(self, channel=None, verbose=False):
+    def load_config_channel_single(self, channel, verbose=False):
         """
         Load configuration settings for a single channel.
 
         Parameters
         ----------
-        channel : str or int, default None
+        channel : str or int
             Channel name or number.
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
         try:
             channel_config = self.channels[chan_idx].LoadMotorConfiguration(
@@ -492,9 +568,8 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         if not channel:
-            # If channel = None, do to all channels in the device
+            # If channel == None, do to all channels in the device
             self.set_setting_channels(
                 self.channel_names, device_settings, verbose
             )
@@ -526,21 +601,20 @@ class BBD30XController:
         return None
 
     def set_setting_channel_single(
-        self, channel=None, device_settings=None, verbose=False
+        self, channel, device_settings=None, verbose=False
     ):
         """
         Set settings for a single channel.
 
         Parameters
         ----------
-        channel : str or int, default None
+        channel : str or int
             Channel name or number.
         device_settings : unknown type, default None
             Device settings to apply.
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         if not device_settings:
             this_channel = self.channels[self._get_channel_idx(channel)]
             device_settings = this_channel.MotorDeviceSettings
@@ -569,7 +643,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.start_polling_single(chan, pol_rate, verbose)
@@ -577,7 +650,7 @@ class BBD30XController:
                 print(f'Polling all channels {channel}')
                 print('------------------------')
         else:
-            # If channel = None, start polling all channels in the device
+            # If channel == None, start polling all channels in the device
             self.start_polling_channels(self.channel_names, pol_rate, verbose)
         return None
 
@@ -594,7 +667,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         # Polling rate in ms
         self.channels[self._get_channel_idx(channel)].StartPolling(pol_rate)
         if verbose:
@@ -613,7 +685,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.enable_single(chan, verbose)
@@ -621,7 +692,7 @@ class BBD30XController:
                 print(f'All channels {channel} are ENABLED')
                 print('------------------------')
         else:
-            # If channel = None, do to all channels in the device
+            # If channel == None, do to all channels in the device
             self.enable_channels(self.channel_names, verbose)
         return None
 
@@ -636,7 +707,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
         if not self.channels[chan_idx].IsEnabled:
             self.channels[self._get_channel_idx(channel)].EnableDevice()
@@ -659,13 +729,12 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.disable_single(chan, verbose)
             if verbose:
-                print(f"All channels {channel} are DISABLED")
-                print("------------------------")
+                print(f'All channels {channel} are DISABLED')
+                print('------------------------')
         else:
             # If channel = None, disable all channels in the device
             self.disable_channels(self.channel_names, verbose)
@@ -682,7 +751,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
         if self.channels[chan_idx].IsEnabled:
             self.channels[self._get_channel_idx(channel)].DisableDevice()
@@ -708,7 +776,6 @@ class BBD30XController:
         tuple
             Tuple of channels over which to iterate.
         """
-        # TODO: Write a test
         if not isinstance(channel, (list, tuple)):
             channel = (channel,)
 
@@ -736,15 +803,14 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.stop_polling_single(chan, verbose)
             if verbose:
-                print(f"Stopped polling all channels {channel}")
-                print("------------------------")
+                print(f'Stopped polling all channels {channel}')
+                print('------------------------')
         else:
-            # If channel = None, stop polling all channels in the device
+            # If channel == None, stop polling all channels in the device
             self.stop_polling_channels(self.channel_names, verbose)
         return None
 
@@ -759,7 +825,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         self.channels[self._get_channel_idx(channel)].StopPolling()
         if verbose:
             print(f'Stopped polling channel {channel}')
@@ -779,7 +844,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         if channel:
             for chan in self._make_channel_iterator(channel):
                 self.home_single(chan, force, verbose)
@@ -791,20 +855,19 @@ class BBD30XController:
             self.home_channels(self.channel_names, force, verbose)
         return None
 
-    def home_single(self, channel=None, force=True, verbose=False):
+    def home_single(self, channel, force=True, verbose=False):
         """
         Home a single channel.
 
         Parameters
         ----------
-        channel : str or int, default None
+        channel : str or int
             Channel name or number.
         force : bool, default True
             Whether to force homing even if already homed.
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
         assert self.channels[chan_idx].NeedsHoming, (
             f'Channel {self.channels[chan_idx]} does not need homing'
@@ -828,7 +891,7 @@ class BBD30XController:
             print(f'Channel {channel} was already homed')
         return None
 
-    def moveToFast(self, target_pos):
+    def move_to_fast(self, target_pos):
         """
         Move channels to specified positions quickly.
 
@@ -837,7 +900,6 @@ class BBD30XController:
         target_pos : list
             List of end positions for each channel.
         """
-        # TODO: Write a test
         for chan_idx, chan_target_pos in enumerate(target_pos):
             try:
                 # 60 second timeout
@@ -850,7 +912,7 @@ class BBD30XController:
                     f'{self.channels[chan_idx]} to {chan_target_pos} mm: {e}'
                 )
 
-    def moveTo(
+    def move_to(
         self, target_pos, channel=None, relative=False, max_vel=None, acc=None,
         permanent=False, verbose=False
     ):
@@ -874,7 +936,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         if not channel:
             channel = self.channel_names
         channel = self._make_channel_iterator(channel)
@@ -888,7 +949,7 @@ class BBD30XController:
         for chan_idx in range(len(channel)):
             # max_vel and acc are set to none since they have already been
             # changed
-            self.moveTo_channel(
+            self.move_to_channel(
                 target_pos[chan_idx], channel[chan_idx], relative, max_vel,
                 acc, permanent, verbose
             )
@@ -896,7 +957,7 @@ class BBD30XController:
             self.print_position()
         return None
 
-    def moveTo_channel(
+    def move_to_channel(
         self, target_pos, channel, relative=False, max_vel=None, acc=None,
         permanent=False, verbose=False
     ):
@@ -920,7 +981,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
         vel_params_original = None
         if verbose:
@@ -956,7 +1016,7 @@ class BBD30XController:
             )
         return None
 
-    def moveTo_channel_relative(
+    def move_to_channel_relative(
         self, rel_pos, channel, max_vel=None, acc=None, permanent=False,
         verbose=False
     ):
@@ -978,8 +1038,7 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
-        self.moveTo_channel(
+        self.move_to_channel(
             target_pos=rel_pos, channel=channel, relative=True,
             max_vel=max_vel, acc=acc, permanent=permanent, verbose=verbose
         )
@@ -1002,7 +1061,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         if channel:
             channel = self._make_channel_iterator(channel)
             max_vel = (max_vel,) if max_vel is not None else None
@@ -1057,7 +1115,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         chan_idx = self._get_channel_idx(channel)
 
         if max_vel is not None:
@@ -1091,7 +1148,6 @@ class BBD30XController:
 
     def print_position(self):
         """Print the current position of the device."""
-        # TODO: Write a test
         name = self.channel_names
         position = self.get_position()
         print(f'Device position: channels {name} - {position} mm')
@@ -1110,7 +1166,6 @@ class BBD30XController:
         Decimal
             Current position of the channel.
         """
-        # TODO: Write a test
         return self.channels[self._get_channel_idx(channel)].Position
 
     def get_position_channel(self, channel, verbose=False):
@@ -1129,7 +1184,6 @@ class BBD30XController:
         float
             Current position of the channel.
         """
-        # TODO: Write a test
         pos = self._decimal_to_float(self.get_position_decimal(channel))
         if verbose:
             print(f'Channel {channel} is in position {pos} mm')
@@ -1151,7 +1205,6 @@ class BBD30XController:
         tuple
             Tuple of acceleration and maximum velocity.
         """
-        # TODO: Write a test
         this_channel = self.channels[self._get_channel_idx(channel)]
         velParams = this_channel.GetVelocityParams()
         if verbose:
@@ -1176,7 +1229,6 @@ class BBD30XController:
         list
             List of current positions for each channel.
         """
-        # TODO: Write a test
         pos = [
             self.get_position_channel(chan, verbose=verbose)
             for chan in self.channel_names
@@ -1192,7 +1244,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         self.device.Disconnect()
         if verbose:
             print(f'Device {self.name} is DISCONNECTED')
@@ -1207,7 +1258,6 @@ class BBD30XController:
         verbose : bool, default False
             Whether to print additional information.
         """
-        # TODO: Write a test
         self.stop_polling_channels(verbose=verbose)
         self.disconnect(verbose=verbose)
 
@@ -1326,6 +1376,10 @@ class BBD30XController:
         # self.print_position()
         # self.finish(verbose=True)
 
+    @property
+    def devices(self) -> typing.Mapping[str, microscope.abc.Device]:
+        return {self.device.Description: self.device}
+
 
 if __name__ == '__main__':
     # Initialise a simulated test controller
@@ -1333,6 +1387,7 @@ if __name__ == '__main__':
     conn = BBD30XController(
         name=name, simulated=True, verbose=True, very_verbose=True
     )
+    print(conn.devices)
 
     conn.test_basic()
     # conn.moveTo([53.452546, 30.3564564], max_vel=10, acc=200, verbose=True)
